@@ -7,8 +7,7 @@
 
 void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
 
-    if (argc < 1 || (argc == 1 && strcmp(argv[0], "vmi-honeymon")))
-        return;
+    if (argc < 1 || (argc == 1 && strcmp(argv[0], "vmi-honeymon"))) return;
 
     int x = 1;
     while (x < argc) {

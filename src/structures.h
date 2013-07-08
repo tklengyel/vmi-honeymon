@@ -65,6 +65,9 @@ typedef struct {
 } honeymon_log_interface_t;
 
 typedef struct {
+
+    GMutex lock;
+
     honeymon_xen_interface_t* xen;
     honeymon_log_interface_t* log;
 
@@ -83,7 +86,7 @@ typedef struct {
     char* virusdir;
 
     GTree* honeypots; // a tree of honeymon_honeypot_t's
-    unsigned int bridges;
+    uint16_t vlans :12; //vlan id
 
     char* scanconf;
     char* scanscheduleconf;
@@ -120,6 +123,9 @@ typedef struct {
 } honeymon_tcp_conn_t;
 
 typedef struct {
+
+    GMutex lock;
+
     char* origin_name;
     char* snapshot_path;
     char* config_path;
@@ -140,8 +146,8 @@ typedef struct {
     char* clone_name;
     char* qcow2_path;
     char* config_path;
-    char* bridge;
-    unsigned int domID;
+    uint16_t vlan;
+    uint32_t domID;
     bool memshared;
 
     // thread stuff
@@ -151,7 +157,7 @@ typedef struct {
     GCond cond;
     bool active;
     bool paused;
-    bool revert;
+    bool finish;
 
     // scan scheduling
     uint32_t nscans; // number of scans to be scheduled
@@ -171,7 +177,7 @@ typedef struct {
 
 // guestfs
 #ifdef HAVE_LIBGUESTFS
-    guestfs_h* guestfs;
+guestfs_h* guestfs;
 #endif
 } honeymon_clone_t;
 

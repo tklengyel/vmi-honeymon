@@ -78,9 +78,9 @@ void honeymon_mysql_log_session(honeymon_t *honeymon, honeymon_clone_t *clone) {
 
     pthread_mutex_lock(&(honeymon->log->mysql_lock));
     mysql_ping(honeymon->log->mysql_conn);
-    if (mysql_query(honeymon->log->mysql_conn, query))
-        printf("Logging session to MySQL failed: %s\n",
-                mysql_error(honeymon->log->mysql_conn));
+    if (mysql_query(honeymon->log->mysql_conn, query)) printf(
+            "Logging session to MySQL failed: %s\n",
+            mysql_error(honeymon->log->mysql_conn));
     pthread_mutex_unlock(&(honeymon->log->mysql_lock));
 
     free(query);
@@ -103,9 +103,9 @@ void honeymon_mysql_update_session(honeymon_t *honeymon,
 
     pthread_mutex_lock(&(honeymon->log->mysql_lock));
     mysql_ping(honeymon->log->mysql_conn);
-    if (mysql_query(honeymon->log->mysql_conn, query))
-        printf("Updating session in MySQL failed: %s\n",
-                mysql_error(honeymon->log->mysql_conn));
+    if (mysql_query(honeymon->log->mysql_conn, query)) printf(
+            "Updating session in MySQL failed: %s\n",
+            mysql_error(honeymon->log->mysql_conn));
     pthread_mutex_unlock(&(honeymon->log->mysql_lock));
 
     free(query);
@@ -131,9 +131,9 @@ void honeymon_mysql_log_scan(honeymon_t *honeymon, honeymon_clone_t *clone,
 
     pthread_mutex_lock(&(honeymon->log->mysql_lock));
     mysql_ping(honeymon->log->mysql_conn);
-    if (mysql_query(honeymon->log->mysql_conn, query))
-        printf("Logging scan to MySQL failed: %s\n",
-                mysql_error(honeymon->log->mysql_conn));
+    if (mysql_query(honeymon->log->mysql_conn, query)) printf(
+            "Logging scan to MySQL failed: %s\n",
+            mysql_error(honeymon->log->mysql_conn));
     pthread_mutex_unlock(&(honeymon->log->mysql_lock));
 
     free(query);
@@ -158,9 +158,9 @@ void honeymon_mysql_log_meminfo(honeymon_t *honeymon, uint32_t logIDX,
 
     pthread_mutex_lock(&(honeymon->log->mysql_lock));
     mysql_ping(honeymon->log->mysql_conn);
-    if (mysql_query(honeymon->log->mysql_conn, query))
-        printf("Logging scan to MySQL failed: %s\n",
-                mysql_error(honeymon->log->mysql_conn));
+    if (mysql_query(honeymon->log->mysql_conn, query)) printf(
+            "Logging scan to MySQL failed: %s\n",
+            mysql_error(honeymon->log->mysql_conn));
     pthread_mutex_unlock(&(honeymon->log->mysql_lock));
 
     free(query);
@@ -182,9 +182,9 @@ void honeymon_mysql_log_membenchmark(honeymon_t *honeymon, uint32_t logIDX,
 
     pthread_mutex_lock(&(honeymon->log->mysql_lock));
     mysql_ping(honeymon->log->mysql_conn);
-    if (mysql_query(honeymon->log->mysql_conn, query))
-        printf("Logging scan to MySQL failed: %s\n",
-                mysql_error(honeymon->log->mysql_conn));
+    if (mysql_query(honeymon->log->mysql_conn, query)) printf(
+            "Logging scan to MySQL failed: %s\n",
+            mysql_error(honeymon->log->mysql_conn));
     pthread_mutex_unlock(&(honeymon->log->mysql_lock));
 
     free(query);

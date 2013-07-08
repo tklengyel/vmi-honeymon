@@ -15,13 +15,22 @@ AM_CFLAGS += $(GLIB_CFLAGS)
 AM_CFLAGS += $(XML2_CFLAGS)
 AM_CFLAGS += $(MYSQL_CFLAGS)
 AM_CFLAGS += -D_XOPEN_SOURCE=500
-AM_CFLAGS += -ggdb
-AM_CFLAGS += -Wall -Wextra
+
+if HARDENING
+AM_CFLAGS += $(HARDEN_CFLAGS) -DHARDENING
+endif
+
+# Note that -pg is incompatible with HARDENING
+if DEBUG
+AM_CFLAGS += -DHONEYMON_DEBUG -Wall -Wextra -Wno-override-init -Wno-strict-aliasing -g -ggdb3
 AM_CFLAGS += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-variable
-AM_CFLAGS += $(HARDEN_CFLAGS)
+if !HARDENING
+AM_CFLAGS += -pg
+endif
+endif
 
 AM_LDFLAGS = $(LIBS)
-#AM_LDFLAGS += $(GLIB_LIBS)
+AM_LDFLAGS += $(GLIB_LIBS)
 AM_LDFLAGS += $(XML2_LIBS)
 AM_LDFLAGS += $(XC_LIBS)
 AM_LDFLAGS += $(MYSQL_LIBS)

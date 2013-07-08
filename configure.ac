@@ -38,6 +38,15 @@ AC_ARG_ENABLE([hardening],
     [Enable compiler and linker options to frustrate memory corruption exploits @<:@yes@:>@])],
   [hardening="$enableval"],
   [hardening="yes"])
+  
+AC_ARG_ENABLE([debug],
+  [AS_HELP_STRING([--enable-debug],
+    [Enable verbose debug output to be compiled @<:@no@:>@])],
+  [debug="$enableval"],
+  [debug="no"])   
+
+AM_CONDITIONAL([DEBUG], [test x$debug = xyes])
+AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])  
 
 HARDEN_CFLAGS=""
 HARDEN_LDFLAGS=""

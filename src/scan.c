@@ -57,8 +57,7 @@ bool honeymon_scan_start_all(honeymon_clone_t *clone) {
     while (c > 0) {
         c--;
         pthread_join(clone->scan_threads[c], NULL);
-        if (clone->scan_results[c] == 1)
-            change = clone->scan_results[c];
+        if (clone->scan_results[c] == 1) change = clone->scan_results[c];
     }
 
     free(clone->scan_threads);
@@ -143,8 +142,7 @@ bool honeymon_scan_compare(char *scan, char *origin_scan, char *clone_scan,
         char scan[MAX_LINE_LENGTH];
         while (fgets(scan, MAX_LINE_LENGTH, file)) {
             char *nlptr = strchr(scan, '\n');
-            if (nlptr)
-                *nlptr = '\0';
+            if (nlptr) *nlptr = '\0';
             char *save = strdup(scan);
             oscan = g_slist_append(oscan, (gpointer) save);
             oscan_l++;
@@ -156,8 +154,7 @@ bool honeymon_scan_compare(char *scan, char *origin_scan, char *clone_scan,
         char scan[MAX_LINE_LENGTH];
         while (fgets(scan, MAX_LINE_LENGTH, file)) {
             char *nlptr = strchr(scan, '\n');
-            if (nlptr)
-                *nlptr = '\0';
+            if (nlptr) *nlptr = '\0';
             char *save = strdup(scan);
             cscan = g_slist_append(cscan, (gpointer) save);
             cscan_l++;

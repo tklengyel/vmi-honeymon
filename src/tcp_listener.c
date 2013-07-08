@@ -26,11 +26,9 @@ void *honeymon_tcp_handle_connection(void *arg) {
     while (fgets(s, sizeof(s), fp) != 0) {
 
         char *nl = strrchr(s, '\r');
-        if (nl)
-            *nl = '\0';
+        if (nl) *nl = '\0';
         nl = strrchr(s, '\n');
-        if (nl)
-            *nl = '\0';
+        if (nl) *nl = '\0';
 
         printf("Incoming: %s\n", s); /* display message */
         if (!strcmp(s, "bye")) {
@@ -42,10 +40,8 @@ void *honeymon_tcp_handle_connection(void *arg) {
         char *third = strtok(NULL, delim);
         //fputs(s, fp);                             /* echo it back */
 
-        if (first == NULL)
-            break;
-        else if (!strcmp(first, "hello"))
-            fputs("hi\n\r", fp);
+        if (first == NULL) break;
+        else if (!strcmp(first, "hello")) fputs("hi\n\r", fp);
         else if (!strcmp(first, "free")) {
             uint32_t free_clones = honeymon_honeypots_count_free_clones(
                     honeymon);
@@ -94,8 +90,7 @@ void *honeymon_tcp_handle_connection(void *arg) {
 
             fputs(reply, fp);
             free(reply);
-        } else if (second == NULL)
-            break;
+        } else if (second == NULL) break;
         else if (!strcmp(first, "status")) {
             // query vm state (paused/running/inactive)
 
@@ -124,8 +119,7 @@ void *honeymon_tcp_handle_connection(void *arg) {
                         (gpointer) clone, NULL);
                 //honeymon_honeypots_pause_clones3((gpointer)clone_name, (gpointer)clone, NULL);
                 fputs("paused\n\r", fp);
-            } else
-                fputs("inactive\n\r", fp);
+            } else fputs("inactive\n\r", fp);
         } else if (!strcmp(first, "activate")) {
             char *clone_name = second;
             honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
@@ -139,8 +133,7 @@ void *honeymon_tcp_handle_connection(void *arg) {
                 sprintf(reply, "activated,%u\n\r", clone->logIDX);
                 fputs(reply, fp);
                 free(reply);
-            } else
-                fputs("inactive\n\r", fp);
+            } else fputs("inactive\n\r", fp);
 
         } else if (third != NULL) {
             // network event!
@@ -152,32 +145,22 @@ void *honeymon_tcp_handle_connection(void *arg) {
             honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
                     clone_name);
 
-            if (clone == NULL)
-                fputs("inactive\n\r", fp);
+            if (clone == NULL) fputs("inactive\n\r", fp);
             else if (clone->paused) {
                 fputs("paused\n\r", fp);
             } else {
                 printf("Network event going to %s\n", conn_out);
-                if (!clone->revert) {
-                    int rt = g_mutex_trylock(&(clone->scan_lock));
-                    if (rt == 0) {
+                if (!clone->finish) {
+                    if (g_mutex_trylock(&(clone->scan_lock))) {
                         // No scan is running right now, send signal!
                         g_cond_signal(&(clone->cond));
                         g_mutex_unlock(&(clone->scan_lock));
                     } else {
-                        // A scan is already running, revert it after its done!
-                        clone->revert = 1;
-                        clone->paused = 1;
-                        libxl_domain_pause(honeymon->xen->xl_ctx, clone->domID);
+                        clone->finish = 1;
                     }
                 } else {
-                    // Clone is already scheduled for scan and revert
+                    // Clone is already scheduled for scan and destroy
                 }
-                /*printf("Waiting for results to send back..\n");
-                 pthread_mutex_lock(&(clone->network_cond_lock));
-                 pthread_cond_wait(&(clone->network_cond), &(clone->network_cond_lock));
-                 pthread_mutex_unlock(&(clone->network_cond_lock));
-                 fputs("reverted\n\r", fp);*/
             }
         }
     }
@@ -214,10 +197,8 @@ void honeymon_tcp_listener(void *arg) {
     addr.sin_family = AF_INET;
     addr.sin_port = port;
 
-    if (!strcmp(honeymon->tcp_if, "any"))
-        addr.sin_addr.s_addr = INADDR_ANY;
-    else
-        addr.sin_addr.s_addr = inet_addr(honeymon->tcp_if);
+    if (!strcmp(honeymon->tcp_if, "any")) addr.sin_addr.s_addr = INADDR_ANY;
+    else addr.sin_addr.s_addr = inet_addr(honeymon->tcp_if);
 
     if (bind(honeymon->tcp_socket, (struct sockaddr*) &addr, sizeof(addr))
             != 0) {
