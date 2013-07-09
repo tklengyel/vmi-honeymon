@@ -22,7 +22,7 @@ void honeymon_init_honeypot_lists(honeymon_t *honeymon);
 uint32_t honeymon_honeypots_count_free_clones(honeymon_t *honeymon);
 gboolean honeymon_honeypots_pause_clones2(gpointer key, gpointer value,
         gpointer data);
-gboolean honeymon_honeypots_unpause_clones2(gpointer key, gpointer value,
+gboolean honeymon_honeypots_unpause_clones2(char *clone_name, honeymon_clone_t *clone,
         gpointer data);
 
 #endif

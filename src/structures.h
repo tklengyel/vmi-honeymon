@@ -4,6 +4,7 @@
 #define LIBXL_API_VERSION 0x040300
 #define INVALID_DOMID ~(uint32_t)0
 #define GUESTFS_HASH_TYPE "SHA1"
+#define CLONE_BUFFER 5
 
 #include <config.h>
 #include <stdio.h>
@@ -132,7 +133,9 @@ typedef struct {
     char* profile_path;
     char* profile;
     unsigned int domID; // 0 if not actually running but restorable
+    unsigned int cloneIDs; // used to generate clone IDs
     unsigned int clones; // number of active clones
+    unsigned int clone_buffer; // number of inactive clones to keep around at any time
     GTree* clone_list; // clone list of honeymon_clone_t
     GSList* scans; // enabled volatility scans
 

@@ -11,6 +11,7 @@
 #include "structures.h"
 #include "honeypots.h"
 #include "tcp_listener.h"
+#include "xen_helper.h"
 
 void *honeymon_tcp_handle_connection(void *arg) {
 
@@ -35,10 +36,10 @@ void *honeymon_tcp_handle_connection(void *arg) {
             break;
         }
 
-        char *first = strtok(s, delim);
-        char *second = strtok(NULL, delim);
-        char *third = strtok(NULL, delim);
-        //fputs(s, fp);                             /* echo it back */
+        char *saveptr = NULL;
+        char *first = strtok_r(s, delim, &saveptr);
+        char *second = strtok_r(NULL, delim, &saveptr);
+        char *third = strtok_r(NULL, delim, &saveptr);
 
         if (first == NULL) break;
         else if (!strcmp(first, "hello")) fputs("hi\n\r", fp);
@@ -49,40 +50,22 @@ void *honeymon_tcp_handle_connection(void *arg) {
             sprintf(reply, "%u\n\r", free_clones);
             fputs(reply, fp);
             free(reply);
-        } else if (!strcmp(first, "listening")) {
-            pthread_mutex_lock(&(honeymon->revert_queue_lock));
-
-            if (honeymon->revert_queue == NULL) {
-                pthread_cond_wait(&(honeymon->revert_queue_cond),
-                        &(honeymon->revert_queue_lock));
-            }
-
-            char *reply = malloc(
-                    snprintf(NULL, 0, "reverted,%s\n\r",
-                            (char *) honeymon->revert_queue->data) + 1);
-            sprintf(reply, "reverted,%s\n\r",
-                    (char *) honeymon->revert_queue->data);
-
-            printf("Sending revert info of %s\n",
-                    (char *) honeymon->revert_queue->data);
-
-            free((char *) honeymon->revert_queue->data);
-            honeymon->revert_queue = g_slist_delete_link(honeymon->revert_queue,
-                    honeymon->revert_queue);
-
-            pthread_mutex_unlock(&(honeymon->revert_queue_lock));
-
-            fputs(reply, fp);
-            free(reply);
         } else if (!strcmp(first, "random")) {
             honeymon_clone_t *clone = honeymon_honeypots_get_random(honeymon);
 
             char *reply = NULL;
 
             if (clone != NULL) {
+
                 reply = malloc(
-                        snprintf(NULL, 0, "%s\n\r", clone->clone_name) + 1);
-                sprintf(reply, "%s\n\r", clone->clone_name);
+                        snprintf(NULL, 0, "%s,%u,%u\n\r", clone->clone_name, clone->vlan, clone->logIDX) + 1);
+                sprintf(reply, "%s,%u,%u\n\r", clone->clone_name, clone->vlan, clone->logIDX);
+
+                honeymon_honeypots_unpause_clones2(NULL, clone, NULL);
+
+                // Replace this clone in the buffer
+                honeymon_xen_clone_vm(honeymon, clone->origin_name);
+
             } else {
                 reply = malloc(snprintf(NULL, 0, "-\n\r") + 1);
                 sprintf(reply, "-\n\r");
@@ -90,51 +73,6 @@ void *honeymon_tcp_handle_connection(void *arg) {
 
             fputs(reply, fp);
             free(reply);
-        } else if (second == NULL) break;
-        else if (!strcmp(first, "status")) {
-            // query vm state (paused/running/inactive)
-
-            char *clone_name = second;
-            honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
-                    clone_name);
-
-            if (clone == NULL) {
-                //printf("Clone is null, inactive\n");
-                fputs("inactive\n\r", fp);
-            } else {
-                if (clone->paused) {
-                    //printf("Clone found, paused sent\n");
-                    fputs("paused\n\r", fp);
-                } else {
-                    //printf("Clone found, active sent\n");
-                    fputs("active\n\r", fp);
-                }
-            }
-        } else if (!strcmp(first, "pause")) {
-            char *clone_name = second;
-            honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
-                    clone_name);
-            if (clone != NULL) {
-                honeymon_honeypots_pause_clones2((gpointer) clone_name,
-                        (gpointer) clone, NULL);
-                //honeymon_honeypots_pause_clones3((gpointer)clone_name, (gpointer)clone, NULL);
-                fputs("paused\n\r", fp);
-            } else fputs("inactive\n\r", fp);
-        } else if (!strcmp(first, "activate")) {
-            char *clone_name = second;
-            honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
-                    clone_name);
-            if (clone != NULL) {
-                honeymon_honeypots_unpause_clones2((gpointer) clone_name,
-                        (gpointer) clone, NULL);
-                char *reply = malloc(
-                        snprintf(NULL, 0, "activated,%u\n\r", clone->logIDX)
-                                + 1);
-                sprintf(reply, "activated,%u\n\r", clone->logIDX);
-                fputs(reply, fp);
-                free(reply);
-            } else fputs("inactive\n\r", fp);
-
         } else if (third != NULL) {
             // network event!
 
@@ -245,9 +183,6 @@ void honeymon_tcp_start_listener(honeymon_t *honeymon) {
 
     printf("Starting TCP listener on address %s and port %u!\n",
             honeymon->tcp_if, honeymon->tcp_port);
-
-    pthread_mutex_init(&(honeymon->revert_queue_lock), NULL);
-    pthread_cond_init(&(honeymon->revert_queue_cond), NULL);
 
     pthread_t c;
     pthread_create(&c, NULL, (void *) honeymon_tcp_listener, (void *) honeymon);

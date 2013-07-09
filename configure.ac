@@ -226,15 +226,9 @@ AC_CHECK_LIB(xenstore, [xc_read, xs_transaction_start], [], [AC_ERROR([Xenstore 
 
 AC_CHECK_HEADERS([xenctrl.h], [], [AC_ERROR([XenCtrl missing! Did you install Xen yet?])])
 
-AC_CHECK_LIB([xenctrl], [xc_interface_open], [], [AC_ERROR([XenCtrl missing! Did you install Xen yet?])])
- 
 AC_CHECK_LIB([xenctrl], 
-	[xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns], 
-	[
-	AC_DEFINE(HAVE_XENMEMSHARE, 1, "Xen memory-sharing is available") 
-	AC_MSG_NOTICE([Enabling Xen memory sharing feature!])
-	], 
-	[AC_MSG_NOTICE([*** Xen memory-sharing is not available])])
+	[xc_interface_open, xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns], 
+	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
 
 # Check for LibGuestFS
 AC_CHECK_LIB(guestfs, 

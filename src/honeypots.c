@@ -342,8 +342,8 @@ void* honeymon_honeypot_runner(void *input) {
     honeymon_scan_start_all(clone);
 
     destroy:
-    g_mutex_lock(&clone->origin->lock);
     libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID,NULL);
+    g_mutex_lock(&clone->origin->lock);
     g_tree_steal(clone->origin->clone_list, clone->clone_name);
     clone->origin->clones--;
     g_mutex_unlock(&clone->origin->lock);
@@ -523,7 +523,7 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
         //printf("Inserting it to clone list!\n");
         g_tree_insert(origin->clone_list, clone->clone_name, clone);
 
-        origin->clones++;
+        origin->clone_buffer++;
 
     } else {
         // update?
@@ -531,9 +531,8 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
     return clone;
 }
 
-gboolean honeymon_honeypots_unpause_clones2(gpointer key, gpointer value,
+gboolean honeymon_honeypots_unpause_clones2(char *clone_name, honeymon_clone_t *clone,
         gpointer data) {
-    honeymon_clone_t *clone = (honeymon_clone_t *) value;
 
     printf("Unpausing %s!\n", clone->clone_name);
 
@@ -558,6 +557,12 @@ gboolean honeymon_honeypots_unpause_clones2(gpointer key, gpointer value,
         }
 
         g_cond_signal(&(clone->cond));
+
+        g_mutex_lock(&(clone->origin->lock));
+        clone->origin->clone_buffer--;
+        clone->origin->clones++;
+        g_mutex_unlock(&(clone->origin->lock));
+
     } else {
         printf("ERROR: %s wasn't paused!\n", clone->clone_name);
     }

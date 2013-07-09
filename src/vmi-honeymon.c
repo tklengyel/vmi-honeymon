@@ -261,7 +261,7 @@ void honeymon_shell_print_menu() {
             "\t[designate|d <domID>]:		\tDesignate a running VM to be clone origin\n");
     printf(
             "\t[restore|r <origin>|<clone>]:		Restore <origin> or revert <clone>\n");
-    printf("\t[clone|c <origin>]:			Clone an origin VM\n");
+    printf("\t[clone|c <origin>]:			Setup clones of an origin VM (buffer size: %u)\n", CLONE_BUFFER);
     printf("\t[unpause|u <origin>]:			Unpause all the clones of <origin>\n");
     printf("\t[pause|p <origin>]:			Pause all the clones of <origin>\n");
     printf("\t[tcpport <port #>]:			TCP port to listen on\n");

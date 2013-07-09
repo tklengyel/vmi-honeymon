@@ -187,7 +187,19 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     honeymon_honeypot_t *honeypot = (honeymon_honeypot_t *) g_tree_lookup(
             honeymon->honeypots, name);
 
-    honeypot->clones++;
+    if(!honeypot) return 1;
+
+    repeat:
+    g_mutex_lock(&honeypot->lock);
+
+    if(honeypot->clone_buffer >= CLONE_BUFFER) {
+        g_mutex_unlock(&honeypot->lock);
+        return 1;
+    }
+
+    honeypot->cloneIDs++;
+    uint32_t clone_id = honeypot->cloneIDs;
+
     g_mutex_lock(&honeymon->lock);
     honeymon->vlans++;
     uint16_t vlan_id = honeymon->vlans;
@@ -196,18 +208,18 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     // Setup clone
     char *disk_clone_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
-                    honeypot->clones) + 1);
+                    clone_id) + 1);
     char *clone_config_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.config", honeymon->honeypotsdir, name,
-                    honeypot->clones) + 1);
+                    clone_id) + 1);
     char *clone_name = malloc(
-            snprintf(NULL, 0, "%s.%u", name, honeypot->clones) + 1);
+            snprintf(NULL, 0, "%s.%u", name, clone_id) + 1);
     char *vlan = malloc(snprintf(NULL, 0, ".%u", vlan_id) + 1);
     sprintf(disk_clone_path, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
-            honeypot->clones);
+            clone_id);
     sprintf(clone_config_path, "%s/%s.%u.config", honeymon->honeypotsdir, name,
-            honeypot->clones);
-    sprintf(clone_name, "%s.%u", name, honeypot->clones);
+            clone_id);
+    sprintf(clone_name, "%s.%u", name, clone_id);
     sprintf(vlan, ".%u", vlan_id);
 
     printf("Creating clone %s\n\tDisk %s\n\tConfig %s\n\tVLAN %u\n", clone_name,
@@ -234,24 +246,10 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     // Replace network bridge
     char delim2[] = ",=";
-    char *original_vif = strdup(vifs->values[0]);
-    char* vif_bridge = strtok(original_vif, delim2);
-    int br_length = 0;
-    while (vif_bridge != NULL) {
-        bool bridge = 0;
-        if (!strcmp(vif_bridge, "bridge")) bridge = 1;
 
-        vif_bridge = strtok(NULL, delim2);
-
-        if (bridge) {
-            br_length = strlen(vif_bridge);
-            break;
-        }
-    }
-
-    char *new_vif = g_malloc0(
-            sizeof(char) * (strlen(vifs->values[0]) + strlen(vlan)));
-    vif_bridge = strtok((vifs->values[0]), delim2);
+    GString *new_vif = g_string_new("");
+    char *saveptr = NULL;
+    char *vif_bridge = strtok_r((vifs->values[0]), delim2, &saveptr);
     int elements = 1;
     bool bridge = 0;
 
@@ -259,25 +257,25 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
         //printf("%i %s %i\n", elements, vif_bridge, bridge);
 
-        strcat(new_vif, vif_bridge);
+        g_string_append(new_vif, vif_bridge);
 
         if (bridge) {
-            strcat(new_vif, vlan);
+            g_string_append(new_vif, vlan);
         }
 
-        if (elements % 2 == 0) strcat(new_vif, ",");
-        else strcat(new_vif, "=");
+        if (elements % 2 == 0) g_string_append(new_vif, ",");
+        else g_string_append(new_vif, "=");
 
         if (!strcmp(vif_bridge, "bridge")) bridge = 1;
 
-        vif_bridge = strtok(NULL, delim2);
+        vif_bridge = strtok_r(NULL, delim2, &saveptr);
 
         elements++;
     }
 
     //printf("New vif is %s\n", new_vif);
     free(vifs->values[0]);
-    vifs->values[0] = strdup(new_vif);
+    vifs->values[0] = g_string_free(new_vif, FALSE);
 
     // Update the name in the config
     XLU_ConfigList2 *search = config->settings;
@@ -295,9 +293,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
             clone_config_path);
 
     command = malloc(
-            snprintf(NULL, 0, "%s restore -p %s %s", XL, clone_config_path,
-                    origin_path) + 1);
-    sprintf(command, "%s restore -p %s %s", XL, clone_config_path, origin_path);
+            snprintf(NULL, 0, "%s create -p %s", XL, clone_config_path) + 1);
+    sprintf(command, "%s create -p %s", XL, clone_config_path);
     printf("** RUNNING COMMAND: %s\n", command);
     sysret = system(command);
     free(command);
@@ -305,15 +302,14 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     uint32_t cloneID = 0;
     libxl_name_to_domid(xen->xl_ctx, clone_name, &cloneID);
     if (cloneID != 0) {
-        printf("Clone created with domID %i!\n", cloneID);
+        printf("Clone shell created with domID %i!\n", cloneID);
     } else {
-        printf("Clone creation failed!\n");
+        printf("Clone shell creation failed!\n");
         return 1;
     }
 
     //clone->domID=cloneID;
     int memshared = 0;
-#ifdef HAVE_XENMEMSHARE
     if (domID == INVALID_DOMID) {
         printf("Skipping memshare as the origin VM is not running!\n");
     } else {
@@ -351,12 +347,14 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         printf("Shared %i pages!\n", shared);
         memshared = 1;
     }
-#endif
 
     honeymon_clone_t *clone = honeymon_honeypots_init_clone(honeymon, name,
             clone_name, vlan_id);
 
     clone->memshared = memshared;
+
+    if(honeypot->clone_buffer < CLONE_BUFFER)
+        goto repeat;
 
     done: xlu_cfg_destroy((XLU_Config *) config);
     //free(disk_clone_path);
@@ -364,6 +362,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     free(config_path);
     free(origin_path);
     free(name);
+
+    g_mutex_unlock(&honeypot->lock);
 
     return 0;
 }
