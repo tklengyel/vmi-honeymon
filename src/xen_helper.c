@@ -101,6 +101,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         libxl_name_to_domid(xen->xl_ctx, name, &domID);
         if (domID == INVALID_DOMID) {
             printf("Domain is not running, failed to get domID from name!\n");
+            return 1;
         } else {
             printf("Got domID from name: %u\n", domID);
         }
@@ -187,12 +188,11 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     honeymon_honeypot_t *honeypot = (honeymon_honeypot_t *) g_tree_lookup(
             honeymon->honeypots, name);
 
-    if(!honeypot) return 1;
+    if (!honeypot) return 1;
 
-    repeat:
     g_mutex_lock(&honeypot->lock);
 
-    if(honeypot->clone_buffer >= CLONE_BUFFER) {
+    repeat: if (honeypot->clone_buffer >= CLONE_BUFFER) {
         goto done;
     }
 
@@ -211,8 +211,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     char *clone_config_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.config", honeymon->honeypotsdir, name,
                     clone_id) + 1);
-    char *clone_name = malloc(
-            snprintf(NULL, 0, "%s.%u", name, clone_id) + 1);
+    char *clone_name = malloc(snprintf(NULL, 0, "%s.%u", name, clone_id) + 1);
     char *vlan = malloc(snprintf(NULL, 0, ".%u", vlan_id) + 1);
     sprintf(disk_clone_path, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
             clone_id);
@@ -266,13 +265,14 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         else g_string_append(new_vif, "=");
 
         if (!strcmp(vif_bridge, "bridge")) bridge = 1;
+        else bridge = 0;
 
         vif_bridge = strtok_r(NULL, delim2, &saveptr);
 
         elements++;
     }
 
-    //printf("New vif is %s\n", new_vif);
+    printf("New vif is %s\n", new_vif);
     free(vifs->values[0]);
     vifs->values[0] = g_string_free(new_vif, FALSE);
 
@@ -309,43 +309,76 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     //clone->domID=cloneID;
     int memshared = 0;
-    if (domID == INVALID_DOMID) {
-        printf("Skipping memshare as the origin VM is not running!\n");
-    } else {
 
-        int page = xc_domain_maximum_gpfn(xen->xc, domID) + 1;
+    int page = xc_domain_maximum_gpfn(xen->xc, domID) + 1;
 
-        if (page <= 0) {
-            printf("Failed to get origin max gpfn!\n");
-            goto done;
-        }
-
-        if (xc_memshr_control(xen->xc, domID, 1)) {
-            printf("Failed to enable memsharing on origin!\n");
-            goto done;
-        }
-        if (xc_memshr_control(xen->xc, cloneID, 1)) {
-            printf("Failed to enable memsharing on clone!\n");
-            goto done;
-        }
-
-        uint64_t shandle, chandle;
-        int shared = 0;
-        while (page >= 0) {
-
-            page--;
-
-            if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle)) continue;
-            if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle)) continue;
-            if (xc_memshr_share_gfns(xen->xc, domID, page, shandle, cloneID,
-                    page, chandle)) continue;
-
-            shared++;
-        }
-
-        printf("Shared %i pages!\n", shared);
-        memshared = 1;
+    if (page <= 0) {
+        printf("Failed to get origin max gpfn!\n");
+        goto done;
     }
+
+    if (xc_memshr_control(xen->xc, domID, 1)) {
+        printf("Failed to enable memsharing on origin!\n");
+        goto done;
+    }
+    if (xc_memshr_control(xen->xc, cloneID, 1)) {
+        printf("Failed to enable memsharing on clone!\n");
+        goto done;
+    }
+
+    vcpu_guest_context_any_t vcpu_context;
+    if (xc_vcpu_getcontext(xen->xc, domID, 0, &vcpu_context)) {
+        printf("Failed to get the VCPU context of domain %u\n", domID);
+        goto done;
+    }
+
+    printf("Setting VCPU context of clone\n");
+
+    if (xc_vcpu_setcontext(xen->xc, cloneID, 0, &vcpu_context)) {
+        printf("Failed to set the VCPU context of domain %u\n", cloneID);
+    }
+
+    uint32_t hvm_context_size = xc_domain_hvm_getcontext(xen->xc, domID, NULL,
+            0);
+    if (hvm_context_size <= 0) {
+        printf("HVM context size <= 0. Not an HVM domain?\n");
+        goto done;
+    }
+
+    uint8_t *hvm_context = malloc(hvm_context_size * sizeof(uint8_t));
+
+    if (xc_domain_hvm_getcontext(xen->xc, domID, hvm_context, hvm_context_size)
+            <= 0) {
+        printf("Failed to get HVM context.\n");
+        goto done;
+    }
+
+    printf("Setting HVM context of clone\n");
+
+    if (xc_domain_hvm_setcontext(xen->xc, cloneID, hvm_context,
+            hvm_context_size)) {
+        printf("Failed to set HVM context.\n");
+        goto done;
+    }
+
+    free(hvm_context);
+
+    uint64_t shandle, chandle;
+    int shared = 0;
+    while (page >= 0) {
+
+        page--;
+
+        if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle)) continue;
+        if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle)) continue;
+        if (xc_memshr_share_gfns(xen->xc, domID, page, shandle, cloneID, page,
+                chandle)) continue;
+
+        shared++;
+    }
+
+    printf("Shared %i pages!\n", shared);
+    memshared = 1;
 
     honeymon_clone_t *clone = honeymon_honeypots_init_clone(honeymon, name,
             clone_name, vlan_id);
@@ -354,8 +387,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     printf("Clone %s created", clone->clone_name);
 
-    if(honeypot->clone_buffer < CLONE_BUFFER)
-        goto repeat;
+    if (honeypot->clone_buffer < CLONE_BUFFER) goto repeat;
 
     done: xlu_cfg_destroy((XLU_Config *) config);
     //free(disk_clone_path);
