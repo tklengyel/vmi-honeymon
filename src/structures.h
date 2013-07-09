@@ -128,6 +128,22 @@ typedef struct tcp_conn {
     struct sockaddr_in *client;
 } honeymon_tcp_conn_t;
 
+/* These structs are opaque in xlu but we need them
+ * to parse the configuration files. */
+typedef struct {
+    struct XLU_ConfigList2 *next;
+    char *name;
+    int nvalues, avalues; /* lists have avalues>1 */
+    char **values;
+    int lineno;
+} XLU_ConfigList2;
+
+typedef struct {
+    XLU_ConfigList2 *settings;
+    FILE *report;
+    char *config_source;
+} XLU_Config2;
+
 typedef struct honeypot {
 
     GMutex lock;
@@ -135,8 +151,12 @@ typedef struct honeypot {
     char* origin_name;
     char* snapshot_path;
     char* config_path;
+
+    XLU_Config2 *config;
+
     char* profile_path;
     char* profile;
+
     unsigned int domID; // 0 if not actually running but restorable
     unsigned int cloneIDs; // used to generate clone IDs
     unsigned int clones; // number of active clones

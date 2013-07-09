@@ -409,6 +409,8 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         if ((test1 = fopen(origin->config_path, "r")) != NULL) {
             printf("OK\n");
             fclose(test1);
+            origin->config = (XLU_Config2 *) xlu_cfg_init(stderr, "cmdline");
+            xlu_cfg_readfile((XLU_Config *) origin->config, origin->config_path);
         } else {
             printf("missing!\n");
             honeymon_honeypots_destroy_honeypot_t(origin);
@@ -802,6 +804,7 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->profile_path);
     g_free(honeypot->profile);
     if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
+    xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_free(honeypot);
 }
 

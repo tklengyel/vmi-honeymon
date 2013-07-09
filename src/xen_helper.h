@@ -11,20 +11,6 @@
  *
  */
 
-typedef struct { /* NOT transparent */
-    struct XLU_ConfigList2 *next;
-    char *name;
-    int nvalues, avalues; /* lists have avalues>1 */
-    char **values;
-    int lineno;
-} XLU_ConfigList2;
-
-typedef struct { /* NOT transparent */
-    XLU_ConfigList2 *settings;
-    FILE *report;
-    char *config_source;
-} XLU_Config2;
-
 /* FUNCTIONS */
 
 bool honeymon_xen_init_interface(honeymon_t* honeymon);

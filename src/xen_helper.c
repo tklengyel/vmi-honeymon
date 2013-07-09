@@ -121,41 +121,10 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     honeymon_honeypot_t *honeypot = (honeymon_honeypot_t *) g_tree_lookup(
             honeymon->honeypots, name);
 
-    config_path = malloc(
-            snprintf(NULL, 0, "%s/%s.config", honeymon->originsdir, name) + 1);
-    origin_path = malloc(
-            snprintf(NULL, 0, "%s/%s.origin", honeymon->originsdir, name) + 1);
-    sprintf(config_path, "%s/%s.config", honeymon->originsdir, name);
-    sprintf(origin_path, "%s/%s.origin", honeymon->originsdir, name);
-
-    FILE *test1 = NULL, *test2 = NULL;
-    printf("Checking for %s: ", config_path);
-
-    if ((test1 = fopen(config_path, "r")) != NULL) {
-        printf("OK\n");
-        fclose(test1);
-    } else {
-        printf("missing!\n");
-        return ret;
-    }
-
-    printf("Checking for %s: ", origin_path);
-
-    if ((test2 = fopen(origin_path, "r")) != NULL) {
-        fclose(test2);
-        printf("OK\n");
-    } else {
-        printf("missing!\n");
-        return ret;
-    }
-
-    XLU_Config2 *config = (XLU_Config2 *) xlu_cfg_init(stderr, "cmdline");
-    xlu_cfg_readfile((XLU_Config *) config, config_path);
-
     int number_of_disks;
     XLU_ConfigList *disks_masked = NULL;
     XLU_ConfigList2 *disks = NULL;
-    if (xlu_cfg_get_list((XLU_Config *) config, "disk", &disks_masked,
+    if (xlu_cfg_get_list((XLU_Config *) honeypot->config, "disk", &disks_masked,
             &number_of_disks, 0)) {
         printf("The VM config didn't contain a disk configuration line!\n");
         return ret;
@@ -176,7 +145,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     XLU_ConfigList *vifs_masked = NULL;
     XLU_ConfigList2 *vifs = NULL;
     int number_of_vifs;
-    if (xlu_cfg_get_list((XLU_Config *) config, "vif", &vifs_masked,
+    if (xlu_cfg_get_list((XLU_Config *) honeypot->config, "vif", &vifs_masked,
             &number_of_vifs, 0)) {
         printf("The VM config didn't contain network configuration line!\n");
         return ret;
@@ -276,7 +245,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     vifs->values[0] = g_string_free(new_vif, FALSE);
 
     // Update the name in the config
-    XLU_ConfigList2 *search = config->settings;
+    XLU_ConfigList2 *search = honeypot->config->settings;
     while (search != NULL) {
         if (!strcmp(search->name, "name")) {
             free(search->values[0]);
@@ -287,13 +256,13 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         search = (XLU_ConfigList2 *) search->next;
     }
 
-    honeymon_xen_save_domconfig(honeymon, (XLU_Config *) config,
+    honeymon_xen_save_domconfig(honeymon, (XLU_Config *) honeypot->config,
             clone_config_path);
 
     command = malloc(
             snprintf(NULL, 0, "%s restore -p %s %s", XL, clone_config_path,
-                    origin_path) + 1);
-    sprintf(command, "%s restore -p %s %s", XL, clone_config_path, origin_path);
+                    honeypot->snapshot_path) + 1);
+    sprintf(command, "%s restore -p %s %s", XL, clone_config_path, honeypot->snapshot_path);
     printf("** RUNNING COMMAND: %s\n", command);
     sysret = system(command);
     free(command);
@@ -301,9 +270,9 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     uint32_t cloneID = 0;
     libxl_name_to_domid(xen->xl_ctx, clone_name, &cloneID);
     if (cloneID != 0) {
-        printf("Clone shell created with domID %i!\n", cloneID);
+        printf("Clone created with domID %i!\n", cloneID);
     } else {
-        printf("Clone shell creation failed!\n");
+        printf("Clone creation failed!\n");
         goto done;
     }
 
@@ -358,10 +327,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     free(disk_clone_path);
     free(clone_config_path);
     free(vlan);
-    free(config_path);
-    free(origin_path);
     free(name);
-    xlu_cfg_destroy((XLU_Config *) config);
 
     return ret;
 }
