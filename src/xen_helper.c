@@ -193,8 +193,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     g_mutex_lock(&honeypot->lock);
 
     if(honeypot->clone_buffer >= CLONE_BUFFER) {
-        g_mutex_unlock(&honeypot->lock);
-        return 1;
+        goto done;
     }
 
     honeypot->cloneIDs++;
@@ -352,6 +351,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
             clone_name, vlan_id);
 
     clone->memshared = memshared;
+
+    printf("Clone %s created", clone->clone_name);
 
     if(honeypot->clone_buffer < CLONE_BUFFER)
         goto repeat;

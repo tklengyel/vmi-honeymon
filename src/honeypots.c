@@ -514,8 +514,6 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
         g_mutex_init(&(clone->lock));
         g_mutex_init(&(clone->scan_lock));
         g_cond_init(&(clone->cond));
-        //pthread_mutex_init(&(clone->network_cond_lock), NULL);
-        //pthread_cond_init(&(clone->network_cond), NULL);
 
         pthread_create(&(clone->thread), NULL, honeymon_honeypot_runner,
                 (void *) clone);

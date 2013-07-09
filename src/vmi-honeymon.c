@@ -259,17 +259,17 @@ void honeymon_shell_print_menu() {
     printf("\t[list|l {honeypots}]:			List all VM's or only honeypots\n");
     printf(
             "\t[designate|d <domID>]:		\tDesignate a running VM to be clone origin\n");
+    printf("\t[restore|r <origin>]:		Restore <origin>\n");
     printf(
-            "\t[restore|r <origin>|<clone>]:		Restore <origin> or revert <clone>\n");
-    printf("\t[clone|c <origin>]:			Setup clones of an origin VM (buffer size: %u)\n", CLONE_BUFFER);
+            "\t[clone|c <origin>]:			Setup clones of an origin VM (buffer size: %u)\n",
+            CLONE_BUFFER);
     printf("\t[unpause|u <origin>]:			Unpause all the clones of <origin>\n");
     printf("\t[pause|p <origin>]:			Pause all the clones of <origin>\n");
     printf("\t[tcpport <port #>]:			TCP port to listen on\n");
     printf("\t[tcpif <IP>]:				IP to listen on (or \"any\")\n");
     printf("\t[tcpinit]:				Start TCP listener\n");
     //printf("\t[watch|w]:				Watch live action\n");
-    printf("\t[quit|q]:				Quit (but leave honeypots running)\n");
-    //printf("\t[shutdown|s]:				Shutdown all honeypots and quit\n");
+    printf("\t[quit|q]:				Quit \n");
     printf("\t[help|?|h]:			 	Print this help\n");
 
 }
@@ -300,78 +300,117 @@ void honeymon_shell(honeymon_t* honeymon) {
 
         if (command != NULL) {
 
-            if (!strcmp(command, "list") || !strcmp(command, "l")) if (option
-                    == NULL) honeymon_xen_list_domains(honeymon);
-            else honeymon_honeypots_list(honeymon);
-            else if (!strcmp(command, "workdir")) if (option != NULL) honeymon_set_workdir(
-                    honeymon, option);
-            else printf("Current workdir is %s\n", honeymon->workdir);
-            else if (!strcmp(command, "volatility")) if (option != NULL) {
-                if (honeymon->volatility != NULL) free(honeymon->volatility);
-                honeymon->volatility = strdup(option);
-            } else printf("Current Volatility path is %s\n",
-                    honeymon->volatility);
-            else if (!strcmp(command, "scanconf")) if (option != NULL) {
-                if (honeymon->scanconf != NULL) free(honeymon->scanconf);
-                honeymon->scanconf = strdup(option);
-                honeymon_scanlist_init(honeymon);
-            } else printf("Current Scan config path is %s\n",
-                    honeymon->scanconf);
-            else if (!strcmp(command, "scanschedule")) if (option != NULL) {
-                if (honeymon->scanscheduleconf != NULL) free(
-                        honeymon->scanscheduleconf);
-                honeymon->scanscheduleconf = strdup(option);
-                honeymon_scanschedule_init(honeymon);
-            } else printf("Current Scan schedule config path is %s\n",
-                    honeymon->scanscheduleconf);
-            else if (!strcmp(command, "designate") || !strcmp(command, "d")) if (option
-                    != NULL) honeymon_xen_designate_vm(honeymon, option);
-            else printf(
-                    "Plese specify the vm by name or by id (designate X or d X)!\n");
-            else if (!strcmp(command, "restore") || !strcmp(command, "r")) if (option
-                    != NULL) honeymon_xen_restore(honeymon, option);
-            else printf(
-                    "Please specify the vm by name or by id (restore X or r X)!\n");
-            else if (!strcmp(command, "clone") || !strcmp(command, "c")) if (option
-                    != NULL) if (option2 == NULL) honeymon_xen_clone_vm(
-                    honeymon, option);
-            else {
-                int loop = atoi(option2);
-                while (loop > 0) {
-                    honeymon_xen_clone_vm(honeymon, option);
-                    loop--;
+            if (!strcmp(command, "list") || !strcmp(command, "l")) {
+                if (option == NULL) {
+                    honeymon_xen_list_domains(honeymon);
+                } else {
+                    honeymon_honeypots_list(honeymon);
                 }
+            } else if (!strcmp(command, "workdir")) {
+                if (option != NULL) {
+                    honeymon_set_workdir(honeymon, option);
+                } else {
+                    printf("Current workdir is %s\n", honeymon->workdir);
+                }
+            } else if (!strcmp(command, "volatility")) {
+                if (option != NULL) {
+                    g_free(honeymon->volatility);
+                    honeymon->volatility = strdup(option);
+                } else {
+                    printf("Current Volatility path is %s\n",
+                            honeymon->volatility);
+                }
+            } else if (!strcmp(command, "scanconf")) {
+                if (option != NULL) {
+                    g_free(honeymon->scanconf);
+                    honeymon->scanconf = strdup(option);
+                    honeymon_scanlist_init(honeymon);
+                } else {
+                    printf("Current Scan config path is %s\n",
+                            honeymon->scanconf);
+                }
+            } else if (!strcmp(command, "scanschedule")) {
+                if (option != NULL) {
+                    g_free(honeymon->scanscheduleconf);
+                    honeymon->scanscheduleconf = strdup(option);
+                    honeymon_scanschedule_init(honeymon);
+                } else {
+                    printf("Current Scan schedule config path is %s\n",
+                            honeymon->scanscheduleconf);
+                }
+            } else if (!strcmp(command, "designate") || !strcmp(command, "d")) {
+                if (option != NULL) {
+                    honeymon_xen_designate_vm(honeymon, option);
+                } else {
+                    printf(
+                            "Plese specify the vm by name or by id (designate X or d X)!\n");
+                }
+            } else if (!strcmp(command, "restore") || !strcmp(command, "r")) {
+                if (option != NULL) {
+                    honeymon_xen_restore(honeymon, option);
+                } else {
+                    printf(
+                            "Please specify the vm by name or by id (restore X or r X)!\n");
+                }
+            } else if (!strcmp(command, "clone") || !strcmp(command, "c")) {
+                if (option != NULL) {
+                    if (option2 == NULL) {
+                        honeymon_xen_clone_vm(honeymon, option);
+                    } else {
+                        int loop = atoi(option2);
+                        while (loop > 0) {
+                            honeymon_xen_clone_vm(honeymon, option);
+                            loop--;
+                        }
+                    }
+                } else {
+                    printf(
+                            "Please specify the vm by name or by id (clone X or c X)!\n");
+                }
+            } else if (!strcmp(command, "unpause") || !strcmp(command, "u")) {
+                if (option != NULL) {
+                    honeymon_honeypots_unpause_clones(honeymon, option);
+                } else {
+                    printf("Please specify the Honeypot origin by name!\n");
+                }
+            } else if (!strcmp(command, "pause") || !strcmp(command, "p")) {
+                if (option != NULL) {
+                    honeymon_honeypots_pause_clones(honeymon, option);
+                } else {
+                    printf("Please specify the Honeypot origin by name!\n");
+                }
+            } else if (!strcmp(command, "tcpport")) {
+                if (option != NULL) {
+                    honeymon->tcp_port = atoi(option);
+                    printf("TCP listen port is set to %i\n",
+                            honeymon->tcp_port);
+                } else {
+                    printf("Current TCP port is set to: %u\n",
+                            honeymon->tcp_port);
+                }
+            } else if (!strcmp(command, "tcpif")) {
+                if (option != NULL) {
+                    g_free(honeymon->tcp_if);
+                    honeymon->tcp_if = strdup(option);
+                    printf("TCP listen address is set to %s\n",
+                            honeymon->tcp_if);
+                } else {
+                    printf("Current TCP listen address is set to: %s\n",
+                            honeymon->tcp_if);
+                }
+            } else if (!strcmp(command, "tcpinit")) {
+                if (!honeymon->tcp_init) {
+                    honeymon_tcp_start_listener(honeymon);
+                } else {
+                    printf("TCP Interface has already been initialized!\n");
+                }
+            } else if (!strcmp(command, "quit") || !strcmp(command, "q")
+                    || !strcmp(command, "exit")) {
+                honeymon = honeymon_quit(honeymon);
+            } else if (!strcmp(command, "help") || !strcmp(command, "?")
+                    || !strcmp(command, "h")) {
+                honeymon_shell_print_menu();
             }
-            else printf(
-                    "Please specify the vm by name or by id (clone X or c X)!\n");
-            else if (!strcmp(command, "unpause") || !strcmp(command, "u")) if (option
-                    != NULL) honeymon_honeypots_unpause_clones(honeymon,
-                    option);
-            else printf("Please specify the Honeypot origin by name!\n");
-            else if (!strcmp(command, "pause") || !strcmp(command, "p")) if (option
-                    != NULL) honeymon_honeypots_pause_clones(honeymon, option);
-            else printf("Please specify the Honeypot origin by name!\n");
-            else if (!strcmp(command, "tcpport")) if (option != NULL) {
-                honeymon->tcp_port = atoi(option);
-                printf("TCP listen port is set to %i\n", honeymon->tcp_port);
-            } else printf("Current TCP port is set to: %u\n",
-                    honeymon->tcp_port);
-            else if (!strcmp(command, "tcpif")) if (option != NULL) {
-                if (honeymon->tcp_if != NULL) free(honeymon->tcp_if);
-                honeymon->tcp_if = strdup(option);
-                printf("TCP listen address is set to %s\n", honeymon->tcp_if);
-            } else printf("Current TCP listen address is set to: %s\n",
-                    honeymon->tcp_if);
-            else if (!strcmp(command, "tcpinit")) if (!honeymon->tcp_init) honeymon_tcp_start_listener(
-                    honeymon);
-            else printf("TCP Interface has already been initialized!\n");
-            else if (!strcmp(command, "quit") || !strcmp(command, "q")
-                    || !strcmp(command, "exit")) honeymon = honeymon_quit(
-                    honeymon);
-            else if (!strcmp(command, "shutdown") || !strcmp(command, "s")) honeymon =
-                    honeymon_shutdown(honeymon);
-            else if (!strcmp(command, "help") || !strcmp(command, "?")
-                    || !strcmp(command, "h")) honeymon_shell_print_menu();
 
         }
     }
