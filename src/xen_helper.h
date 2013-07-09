@@ -47,6 +47,7 @@ void honeymon_xen_free_domconfig(XLU_Config *config);
 int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom);
 void honeymon_xen_restore(honeymon_t *honeymon, char *option);
 int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom);
+void honeymon_xen_clone_factory(honeymon_t *honeymon, char* dom);
 int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom);
 void honeymon_xen_revert_clone(honeymon_t *honeymon, char *name);
 

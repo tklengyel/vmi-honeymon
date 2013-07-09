@@ -355,13 +355,7 @@ void honeymon_shell(honeymon_t* honeymon) {
             } else if (!strcmp(command, "clone") || !strcmp(command, "c")) {
                 if (option != NULL) {
                     if (option2 == NULL) {
-                        honeymon_xen_clone_vm(honeymon, option);
-                    } else {
-                        int loop = atoi(option2);
-                        while (loop > 0) {
-                            honeymon_xen_clone_vm(honeymon, option);
-                            loop--;
-                        }
+                        honeymon_xen_clone_factory(honeymon, option);
                     }
                 } else {
                     printf(
