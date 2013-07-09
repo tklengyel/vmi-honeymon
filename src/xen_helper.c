@@ -117,6 +117,10 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         }
     }
 
+    // Get the honeypot structure
+    honeymon_honeypot_t *honeypot = (honeymon_honeypot_t *) g_tree_lookup(
+            honeymon->honeypots, name);
+
     config_path = malloc(
             snprintf(NULL, 0, "%s/%s.config", honeymon->originsdir, name) + 1);
     origin_path = malloc(
@@ -186,10 +190,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     vifs = (XLU_ConfigList2 *) vifs_masked;
     char *original_vif = strdup(vifs->values[0]);
 
-    // Get the honeypot structure
-    honeymon_honeypot_t *honeypot = (honeymon_honeypot_t *) g_tree_lookup(
-            honeymon->honeypots, name);
-
     if (!honeypot) return ret;
 
     g_mutex_lock(&honeypot->lock);
@@ -199,7 +199,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     g_mutex_lock(&honeymon->lock);
     honeymon->vlans++;
-    if(honeymon->vlans<MIN_VLAN) honeymon->vlans+=MIN_VLAN;
+    if (honeymon->vlans < MIN_VLAN) honeymon->vlans += MIN_VLAN;
     uint16_t vlan_id = honeymon->vlans;
     g_mutex_unlock(&honeymon->lock);
 
@@ -291,8 +291,9 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
             clone_config_path);
 
     command = malloc(
-            snprintf(NULL, 0, "%s create -p %s", XL, clone_config_path) + 1);
-    sprintf(command, "%s create -p %s", XL, clone_config_path);
+            snprintf(NULL, 0, "%s restore -p %s %s", XL, clone_config_path,
+                    origin_path) + 1);
+    sprintf(command, "%s restore -p %s %s", XL, clone_config_path, origin_path);
     printf("** RUNNING COMMAND: %s\n", command);
     sysret = system(command);
     free(command);
@@ -325,43 +326,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         goto done;
     }
 
-    vcpu_guest_context_any_t vcpu_context;
-    if (xc_vcpu_getcontext(xen->xc, domID, 0, &vcpu_context)) {
-        printf("Failed to get the VCPU context of domain %u\n", domID);
-        goto done;
-    }
-
-    printf("Setting VCPU context of clone\n");
-
-    if (xc_vcpu_setcontext(xen->xc, cloneID, 0, &vcpu_context)) {
-        printf("Failed to set the VCPU context of domain %u\n", cloneID);
-    }
-
-    uint32_t hvm_context_size = xc_domain_hvm_getcontext(xen->xc, domID, NULL,
-            0);
-    if (hvm_context_size <= 0) {
-        printf("HVM context size <= 0. Not an HVM domain?\n");
-        goto done;
-    }
-
-    uint8_t *hvm_context = malloc(hvm_context_size * sizeof(uint8_t));
-
-    if (xc_domain_hvm_getcontext(xen->xc, domID, hvm_context, hvm_context_size)
-            <= 0) {
-        printf("Failed to get HVM context.\n");
-        goto done;
-    }
-
-    printf("Setting HVM context of clone\n");
-
-    if (xc_domain_hvm_setcontext(xen->xc, cloneID, hvm_context,
-            hvm_context_size)) {
-        printf("Failed to set HVM context.\n");
-        goto done;
-    }
-
-    free(hvm_context);
-
     uint64_t shandle, chandle;
     int shared = 0;
     while (page >= 0) {
@@ -390,8 +354,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     printf("Clone %s created\n", clone->clone_name);
 
-    done:
-    free(clone_name);
+    done: free(clone_name);
     free(disk_clone_path);
     free(clone_config_path);
     free(vlan);
@@ -401,13 +364,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     xlu_cfg_destroy((XLU_Config *) config);
 
     return ret;
-}
-
-void honeymon_xen_clone_factory(honeymon_t *honeymon, char* dom) {
-    int number = 1;
-    while(number>0) {
-        number = honeymon_xen_clone_vm(honeymon, dom);
-    }
 }
 
 void honeymon_xen_list_domains(honeymon_t* honeymon) {
@@ -514,8 +470,11 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
             snprintf(NULL, 0, "%s/%s.origin", honeymon->originsdir, name) + 1);
     char *output_config = malloc(
             snprintf(NULL, 0, "%s/%s.config", honeymon->originsdir, name) + 1);
+    char *output_profile = malloc(
+            snprintf(NULL, 0, "%s/%s.profile", honeymon->originsdir, name) + 1);
     sprintf(output, "%s/%s.origin", honeymon->originsdir, name);
     sprintf(output_config, "%s/%s.config", honeymon->originsdir, name);
+    sprintf(output_profile, "%s/%s.profile", honeymon->originsdir, name);
 
     struct stat buf;
     if (!stat(output, &buf)) printf("Overwriting snapshot of %u at %s!\n",
@@ -541,16 +500,6 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
     sysret = system(command);
     free(command);
 
-    libxl_name_to_domid(xen->xl_ctx, name, &domID);
-
-    honeymon_honeypot_t* honeypot = honeymon_honeypots_init_honeypot(honeymon,
-            name);
-
-    if (honeypot->profile != NULL) {
-        printf("Previous profile was %s\n", honeypot->profile);
-        free(honeypot->profile);
-    }
-
     char profile[128];
     printf("Please enter the Volatility profile of this VM: ");
     fflush(stdout);
@@ -559,11 +508,15 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
     if (nl) *nl = '\0';
     nl = strrchr(p, '\n');
     if (nl) *nl = '\0';
-    honeypot->profile = strdup(profile);
 
-    FILE *output_prof = fopen(honeypot->profile_path, "w");
-    fprintf(output_prof, "%s", honeypot->profile);
+    FILE *output_prof = fopen(output_profile, "w");
+    fprintf(output_prof, "%s", profile);
     fclose(output_prof);
+
+    libxl_name_to_domid(xen->xl_ctx, name, &domID);
+
+    honeymon_honeypot_t* honeypot = honeymon_honeypots_init_honeypot(honeymon,
+            name);
 
     if (honeypot->scans != NULL) g_slist_free_full(honeypot->scans,
             (GDestroyNotify) free);
@@ -641,6 +594,7 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
 
     free(output);
     free(output_config);
+    free(output_profile);
     return 0;
 }
 

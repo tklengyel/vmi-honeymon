@@ -64,7 +64,7 @@ void *honeymon_tcp_handle_connection(void *arg) {
                 honeymon_honeypots_unpause_clones2(NULL, clone, NULL);
 
                 // Replace this clone in the buffer
-                honeymon_xen_clone_vm(honeymon, clone->origin_name);
+                g_async_queue_push(clone->honeymon->clone_requests, strdup(clone->origin_name));
 
             } else {
                 reply = malloc(snprintf(NULL, 0, "-\n\r") + 1);

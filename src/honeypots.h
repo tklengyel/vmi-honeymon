@@ -25,4 +25,6 @@ gboolean honeymon_honeypots_pause_clones2(gpointer key, gpointer value,
 gboolean honeymon_honeypots_unpause_clones2(char *clone_name, honeymon_clone_t *clone,
         gpointer data);
 
+void* honeymon_honeypot_clone_factory(void *input);
+
 #endif

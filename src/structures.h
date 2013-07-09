@@ -35,19 +35,19 @@
 #include <magic.h>
 #endif
 
-typedef struct {
+typedef struct xen_interface {
     struct xs_handle *xsh;
     xc_interface *xc;
     libxl_ctx *xl_ctx;
     xentoollog_logger *xl_logger;
 } honeymon_xen_interface_t;
 
-typedef struct {
+typedef struct xen_domconfig_raw {
     uint8_t *config_data;
     int config_length;
 } honeymon_xen_domconfig_raw_t;
 
-typedef struct {
+typedef struct log_interface {
 
     pthread_mutex_t log_IDX_lock;
     uint32_t log_IDX;
@@ -66,7 +66,7 @@ typedef struct {
 
 } honeymon_log_interface_t;
 
-typedef struct {
+typedef struct honeymon {
 
     GMutex lock;
 
@@ -89,6 +89,10 @@ typedef struct {
 
     GTree* honeypots; // a tree of honeymon_honeypot_t's
     uint16_t vlans :12; //vlan id
+
+    // clone factory
+    GAsyncQueue *clone_requests;
+    pthread_t clone_factory;
 
     char* scanconf;
     char* scanscheduleconf;
@@ -117,14 +121,14 @@ magic_t magic_cookie;
 #endif
 } honeymon_t;
 
-typedef struct {
+typedef struct tcp_conn {
     honeymon_t *honeymon;
     FILE *buffer;
     int socket;
     struct sockaddr_in *client;
 } honeymon_tcp_conn_t;
 
-typedef struct {
+typedef struct honeypot {
 
     GMutex lock;
 
@@ -136,6 +140,7 @@ typedef struct {
     unsigned int domID; // 0 if not actually running but restorable
     unsigned int cloneIDs; // used to generate clone IDs
     unsigned int clones; // number of active clones
+    unsigned int max_clones; // max number of active clones
     unsigned int clone_buffer; // number of inactive clones to keep around at any time
     GTree* clone_list; // clone list of honeymon_clone_t
     GSList* scans; // enabled volatility scans
@@ -143,7 +148,7 @@ typedef struct {
     GSList* fschecksum; // each node is a GTree with the file path as key and hash as value
 } honeymon_honeypot_t;
 
-typedef struct {
+typedef struct clone {
     honeymon_t* honeymon;
     honeymon_honeypot_t* origin;
     char* origin_name;
@@ -185,7 +190,7 @@ guestfs_h* guestfs;
 #endif
 } honeymon_clone_t;
 
-typedef struct {
+typedef struct scan_input {
     char* domain;
     char* scan;
     honeymon_t* honeymon;

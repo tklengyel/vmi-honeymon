@@ -53,9 +53,11 @@ void honeymon_init() {
 
     honeymon->log = g_malloc0(sizeof(honeymon_log_interface_t));
 
-    honeymon->tcp_if = malloc(snprintf(NULL, 0, "127.0.0.1") + 1);
+    honeymon->tcp_if = g_malloc(snprintf(NULL, 0, "127.0.0.1") + 1);
     sprintf(honeymon->tcp_if, "127.0.0.1");
     honeymon->tcp_port = 4567;
+
+    honeymon->clone_requests = g_async_queue_new();
 
 #ifdef HAVE_LIBMAGIC
     honeymon->magic_cookie=magic_open(MAGIC_MIME);
@@ -65,6 +67,14 @@ void honeymon_init() {
     }
 #endif
 
+
+    pthread_attr_t tattr;
+    int ret = pthread_attr_init(&tattr);
+    ret = pthread_attr_setdetachstate(&tattr,
+            PTHREAD_CREATE_DETACHED);
+    pthread_create(&(honeymon->clone_factory), &tattr,
+            honeymon_honeypot_clone_factory, (void *) honeymon);
+    pthread_attr_destroy(&tattr);
 }
 
 honeymon_t* honeymon_free(honeymon_t* honeymon) {
@@ -78,6 +88,7 @@ honeymon_t* honeymon_free(honeymon_t* honeymon) {
         g_free(honeymon->scanconf);
         g_free(honeymon->tcp_if);
         if (honeymon->tcp_init) shutdown(honeymon->tcp_socket, 0);
+        g_async_queue_unref(honeymon->clone_requests);
 
         g_free(honeymon->log);
         g_free(honeymon);
@@ -240,6 +251,7 @@ honeymon_t* honeymon_quit(honeymon_t* honeymon) {
     if (honeymon->tcp_socket > 0) shutdown(honeymon->tcp_socket, 2);
 
     g_tree_destroy(honeymon->honeypots);
+    g_async_queue_push(honeymon->clone_requests,"exit thread");
 
     return honeymon_free(honeymon);
 }
@@ -356,7 +368,13 @@ void honeymon_shell(honeymon_t* honeymon) {
             } else if (!strcmp(command, "clone") || !strcmp(command, "c")) {
                 if (option != NULL) {
                     if (option2 == NULL) {
-                        honeymon_xen_clone_factory(honeymon, option);
+                        g_async_queue_push(honeymon->clone_requests, strdup(option));
+                    } else {
+                        int number = atoi(option2);
+                        while(number>0) {
+                            g_async_queue_push(honeymon->clone_requests, strdup(option));
+                            number--;
+                        }
                     }
                 } else {
                     printf(

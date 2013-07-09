@@ -341,16 +341,32 @@ void* honeymon_honeypot_runner(void *input) {
     g_mutex_lock(&(clone->scan_lock));
     honeymon_scan_start_all(clone);
 
-    destroy:
-    libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID,NULL);
+    destroy: libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
     g_mutex_lock(&clone->origin->lock);
     g_tree_steal(clone->origin->clone_list, clone->clone_name);
     clone->origin->clones--;
     g_mutex_unlock(&clone->origin->lock);
     honeymon_free_clone(clone);
 
-    //printf("Clone thread is exiting..\n");
+    printf("Clone thread is exiting.\n");
     done: pthread_exit(0);
+    return NULL;
+}
+
+void* honeymon_honeypot_clone_factory(void *input) {
+
+    honeymon_t *honeymon = (honeymon_t *)input;
+    while (1) {
+        char *honeypot = g_async_queue_pop(honeymon->clone_requests);
+        if(!strcmp(honeypot,"exit thread"))
+            break;
+
+        honeymon_xen_clone_vm(honeymon, honeypot);
+
+        free(honeypot);
+    }
+
+    pthread_exit(0);
     return NULL;
 }
 
@@ -374,7 +390,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
                 snprintf(NULL, 0, "%s/%s.config", honeymon->honeypotsdir, name)
                         + 1);
         origin->profile_path = malloc(
-                snprintf(NULL, 0, "%s/%s.profile", honeymon->honeypotsdir, name)
+                snprintf(NULL, 0, "%s/%s.profile", honeymon->originsdir, name)
                         + 1);
 
         unsigned int domID = 0;
@@ -387,11 +403,33 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         sprintf(origin->profile_path, "%s/%s.profile", honeymon->originsdir,
                 name);
 
+        FILE *test1 = NULL, *test2 = NULL;
+        printf("Checking for %s: ", origin->config_path);
+
+        if ((test1 = fopen(origin->config_path, "r")) != NULL) {
+            printf("OK\n");
+            fclose(test1);
+        } else {
+            printf("missing!\n");
+            honeymon_honeypots_destroy_honeypot_t(origin);
+            return NULL;
+        }
+
+        printf("Checking for %s: ", origin->snapshot_path);
+
+        if ((test2 = fopen(origin->snapshot_path, "r")) != NULL) {
+            fclose(test2);
+            printf("OK\n");
+        } else {
+            printf("missing!\n");
+            honeymon_honeypots_destroy_honeypot_t(origin);
+            return NULL;
+        }
+
         origin->domID = domID;
         origin->clones = 0; // clones will be updated by honeymon_xen_build_clone_list
         origin->clone_list = g_tree_new_full((GCompareDataFunc) strcmp, NULL,
-                NULL,
-                (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
+                NULL, (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
 
         origin->scans = NULL;
         origin->fschecksum = NULL;
@@ -407,6 +445,10 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
             if (nl) *nl = '\0';
             origin->profile = strdup(line);
             fclose(file);
+        } else {
+            printf("Profile file is missing\n");
+            honeymon_honeypots_destroy_honeypot_t(origin);
+            return NULL;
         }
 
         g_tree_insert(honeymon->honeypots, (gpointer) origin->origin_name,
@@ -529,8 +571,8 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
     return clone;
 }
 
-gboolean honeymon_honeypots_unpause_clones2(char *clone_name, honeymon_clone_t *clone,
-        gpointer data) {
+gboolean honeymon_honeypots_unpause_clones2(char *clone_name,
+        honeymon_clone_t *clone, gpointer data) {
 
     printf("Unpausing %s!\n", clone->clone_name);
 
@@ -679,32 +721,30 @@ uint32_t honeymon_honeypots_count_free_clones(honeymon_t *honeymon) {
 }
 
 gboolean honeymon_honeypots_get_random3(gpointer key, honeymon_clone_t *clone,
-        gpointer data) {
-
-    GSList *free_clones = (GSList *) data;
+        GSList **free_clones) {
 
     if (clone->paused) {
-        //printf("Adding free clone to the list: %s\n", clone->clone_name);
-        free_clones = g_slist_append(free_clones, (gpointer) clone);
+        *free_clones = g_slist_append(*free_clones, (gpointer) clone);
     }
 
     return FALSE;
 }
 
 gboolean honeymon_honeypots_get_random2(gpointer key,
-        honeymon_honeypot_t *origin, gpointer data) {
+        honeymon_honeypot_t *origin, GSList **free_clones) {
 
-    g_tree_foreach(origin->clone_list,
-            (GTraverseFunc) honeymon_honeypots_get_random3, data);
+    if (origin->clone_buffer && (!origin->max_clones || origin->clones <= origin->max_clones)) {
+        g_tree_foreach(origin->clone_list,
+                (GTraverseFunc) honeymon_honeypots_get_random3, free_clones);
+    }
     return FALSE;
 }
 
 honeymon_clone_t *honeymon_honeypots_get_random(honeymon_t *honeymon) {
-    GSList *free_clones = g_slist_alloc();
+    GSList *free_clones = NULL;
     g_tree_foreach(honeymon->honeypots,
             (GTraverseFunc) honeymon_honeypots_get_random2,
-            (gpointer) free_clones);
-    free_clones = g_slist_delete_link(free_clones, free_clones);
+            &free_clones);
 
     guint count = g_slist_length(free_clones);
     //printf("Got %i free clones\n", count);
@@ -739,13 +779,16 @@ void honeymon_free_clone(honeymon_clone_t *clone) {
 
 void honeymon_honeypots_destroy_clone_t(honeymon_clone_t *clone) {
     // stop clone thread
+    g_mutex_lock(&clone->lock);
+
     if (clone->active) {
         clone->active = 0;
+        g_mutex_unlock(&clone->lock);
         g_cond_signal(&(clone->cond));
         pthread_join(clone->thread, NULL);
     }
 
-    libxl_domain_destroy(clone->honeymon->xen->xl_ctx, clone->domID,NULL);
+    libxl_domain_destroy(clone->honeymon->xen->xl_ctx, clone->domID, NULL);
     honeymon_free_clone(clone);
 }
 
