@@ -67,17 +67,11 @@ void honeymon_init() {
     }
 #endif
 
-
-    pthread_attr_t tattr;
-    int ret = pthread_attr_init(&tattr);
-    ret = pthread_attr_setdetachstate(&tattr,
-            PTHREAD_CREATE_DETACHED);
-    pthread_create(&(honeymon->clone_factory), &tattr,
+    pthread_create(&(honeymon->clone_factory), NULL,
             honeymon_honeypot_clone_factory, (void *) honeymon);
-    pthread_attr_destroy(&tattr);
 }
 
-honeymon_t* honeymon_free(honeymon_t* honeymon) {
+void honeymon_free(honeymon_t* honeymon) {
     if (honeymon != NULL) {
         g_free(honeymon->workdir);
         g_free(honeymon->originsdir);
@@ -93,6 +87,16 @@ honeymon_t* honeymon_free(honeymon_t* honeymon) {
         g_free(honeymon->log);
         g_free(honeymon);
     }
+}
+
+honeymon_t* honeymon_quit(honeymon_t* honeymon) {
+    if (honeymon->tcp_socket > 0) shutdown(honeymon->tcp_socket, 2);
+
+    g_tree_destroy(honeymon->honeypots);
+    g_async_queue_push(honeymon->clone_requests,"exit thread");
+    pthread_join(honeymon->clone_factory,NULL);
+
+    honeymon_free(honeymon);
     return NULL;
 }
 
@@ -245,19 +249,6 @@ void honeymon_set_workdir(honeymon_t* honeymon, char *workdir) {
     honeymon_workdir_init(honeymon);
 
     printf("Working directory changed to %s\n", honeymon->workdir);
-}
-
-honeymon_t* honeymon_quit(honeymon_t* honeymon) {
-    if (honeymon->tcp_socket > 0) shutdown(honeymon->tcp_socket, 2);
-
-    g_tree_destroy(honeymon->honeypots);
-    g_async_queue_push(honeymon->clone_requests,"exit thread");
-
-    return honeymon_free(honeymon);
-}
-
-honeymon_t* honeymon_shutdown(honeymon_t* honeymon) {
-    return NULL;
 }
 
 void honeymon_shell_print_menu() {
