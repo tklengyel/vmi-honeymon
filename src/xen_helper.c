@@ -183,6 +183,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     }
 
     vifs = (XLU_ConfigList2 *) vifs_masked;
+    char *original_vif = strdup(vifs->values[0]);
 
     // Get the honeypot structure
     honeymon_honeypot_t *honeypot = (honeymon_honeypot_t *) g_tree_lookup(
@@ -191,6 +192,11 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     if (!honeypot) return 1;
 
     g_mutex_lock(&honeypot->lock);
+
+    char *disk_clone_path = NULL;
+    char *clone_config_path = NULL;
+    char *clone_name = NULL;
+    char *vlan = NULL;
 
     repeat: if (honeypot->clone_buffer >= CLONE_BUFFER) {
         goto done;
@@ -205,14 +211,14 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     g_mutex_unlock(&honeymon->lock);
 
     // Setup clone
-    char *disk_clone_path = malloc(
+    disk_clone_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
                     clone_id) + 1);
-    char *clone_config_path = malloc(
+    clone_config_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.config", honeymon->honeypotsdir, name,
                     clone_id) + 1);
-    char *clone_name = malloc(snprintf(NULL, 0, "%s.%u", name, clone_id) + 1);
-    char *vlan = malloc(snprintf(NULL, 0, ".%u", vlan_id) + 1);
+    clone_name = malloc(snprintf(NULL, 0, "%s.%u", name, clone_id) + 1);
+    vlan = malloc(snprintf(NULL, 0, ".%u", vlan_id) + 1);
     sprintf(disk_clone_path, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
             clone_id);
     sprintf(clone_config_path, "%s/%s.%u.config", honeymon->honeypotsdir, name,
@@ -247,7 +253,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     GString *new_vif = g_string_new("");
     char *saveptr = NULL;
-    char *vif_bridge = strtok_r((vifs->values[0]), delim2, &saveptr);
+    char *vif_bridge = strtok_r(original_vif, delim2, &saveptr);
     int elements = 1;
     bool bridge = 0;
 
@@ -272,7 +278,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         elements++;
     }
 
-    printf("New vif is %s\n", new_vif);
+    printf("New vif is %s\n", new_vif->str);
     free(vifs->values[0]);
     vifs->values[0] = g_string_free(new_vif, FALSE);
 
@@ -385,13 +391,16 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     clone->memshared = memshared;
 
-    printf("Clone %s created", clone->clone_name);
+    printf("Clone %s created\n", clone->clone_name);
+
+    free(clone_name);
+    free(disk_clone_path);
+    free(clone_config_path);
+    free(vlan);
 
     if (honeypot->clone_buffer < CLONE_BUFFER) goto repeat;
 
     done: xlu_cfg_destroy((XLU_Config *) config);
-    //free(disk_clone_path);
-    //free(clone_config_path);
     free(config_path);
     free(origin_path);
     free(name);
