@@ -39,6 +39,7 @@ void honeymon_init() {
     g_mutex_init(&honeymon->lock);
 
     honeymon->interactive = 1;
+    honeymon->vlans = MIN_VLAN;
 
 #ifdef VOLATILITY
     honeymon->volatility=strdup(VOLATILITY);

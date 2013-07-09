@@ -199,6 +199,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     g_mutex_lock(&honeymon->lock);
     honeymon->vlans++;
+    if(honeymon->vlans<MIN_VLAN) honeymon->vlans+=MIN_VLAN;
     uint16_t vlan_id = honeymon->vlans;
     g_mutex_unlock(&honeymon->lock);
 
