@@ -125,14 +125,10 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     if (!honeypot) return ret;
 
     g_mutex_lock(&honeypot->lock);
-
-    honeypot->cloneIDs++;
-    uint32_t clone_id = honeypot->cloneIDs;
-
     g_mutex_lock(&honeymon->lock);
+    uint16_t vlan_id = honeymon->vlans;
     honeymon->vlans++;
     if (honeymon->vlans < MIN_VLAN) honeymon->vlans += MIN_VLAN;
-    uint16_t vlan_id = honeymon->vlans;
     g_mutex_unlock(&honeymon->lock);
 
     int number_of_disks;
@@ -177,17 +173,17 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     // Setup clone
     char *disk_clone_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
-                    clone_id) + 1);
+                    vlan_id) + 1);
     char *clone_config_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.config", honeymon->honeypotsdir, name,
-                    clone_id) + 1);
-    char *clone_name = malloc(snprintf(NULL, 0, "%s.%u", name, clone_id) + 1);
+                    vlan_id) + 1);
+    char *clone_name = malloc(snprintf(NULL, 0, "%s.%u", name, vlan_id) + 1);
     char *vlan = malloc(snprintf(NULL, 0, ".%u", vlan_id) + 1);
     sprintf(disk_clone_path, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
-            clone_id);
+            vlan_id);
     sprintf(clone_config_path, "%s/%s.%u.config", honeymon->honeypotsdir, name,
-            clone_id);
-    sprintf(clone_name, "%s.%u", name, clone_id);
+            vlan_id);
+    sprintf(clone_name, "%s.%u", name, vlan_id);
     sprintf(vlan, ".%u", vlan_id);
 
     printf("Creating clone %s\n\tDisk %s\n\tConfig %s\n\tVLAN %u\n", clone_name,
@@ -695,32 +691,7 @@ void honeymon_xen_save_domconfig(honeymon_t* honeymon,
 
         fprintf(output, "%s", setting->name);
         if (setting->nvalues >= 1) {
-            if (setting->avalues > 1) {
-                fprintf(output, "=[ \"%s\" ]", *(setting->values));
-            } else {
-
-                long int x;
-                int number = sscanf(*(setting->values), "%ld", &x);
-
-                if (number) {
-
-                    // Lets check if the number is actually an IP
-                    char delim[] = ".";
-                    char *ip = NULL;
-                    char *token = malloc(
-                            sizeof(char) * strlen(*(setting->values)));
-                    sprintf(token, "%s", *(setting->values));
-                    strtok(token, delim);
-                    strtok(NULL, delim);
-                    ip = strtok(NULL, delim);
-
-                    if (ip != NULL) fprintf(output, "=\"%s\"",
-                            *(setting->values));
-                    else fprintf(output, "=%s", *(setting->values));
-
-                    free(token);
-                } else fprintf(output, "=\"%s\"", *(setting->values));
-            }
+            fprintf(output, "=[ \"%s\" ]", *(setting->values));
         }
         fprintf(output, "\n");
     }

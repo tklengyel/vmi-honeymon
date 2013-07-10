@@ -341,15 +341,18 @@ void* honeymon_honeypot_runner(void *input) {
     g_mutex_lock(&(clone->scan_lock));
     honeymon_scan_start_all(clone);
 
-    destroy: libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
+    destroy:
+    printf("Destroying clone %s\n",clone->clone_name);
+    libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
     g_mutex_lock(&clone->origin->lock);
     g_tree_steal(clone->origin->clone_list, clone->clone_name);
     clone->origin->clones--;
     g_mutex_unlock(&clone->origin->lock);
     honeymon_free_clone(clone);
 
+    done:
     printf("Clone thread is exiting.\n");
-    done: pthread_exit(0);
+    pthread_exit(0);
     return NULL;
 }
 

@@ -166,7 +166,6 @@ typedef struct honeypot {
     char* profile;
 
     unsigned int domID; // 0 if not actually running but restorable
-    unsigned int cloneIDs; // used to generate clone IDs
     unsigned int clones; // number of active clones
     unsigned int max_clones; // max number of active clones
     unsigned int clone_buffer; // number of inactive clones to keep around at any time
