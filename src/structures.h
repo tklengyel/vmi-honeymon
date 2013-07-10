@@ -18,6 +18,9 @@
 #include <xenguest.h>
 #include <xenstore.h>
 #include <glib.h>
+#include <netinet/ether.h>
+#include <netinet/in.h>
+#include <netinet/ip.h>
 
 #ifdef HAVE_LIBTHPOOL
 #include <thpool.h>
@@ -151,8 +154,13 @@ typedef struct honeypot {
     char* origin_name;
     char* snapshot_path;
     char* config_path;
+    char* ip_path;
 
     XLU_Config2 *config;
+
+    // network info
+    char ip[INET_ADDRSTRLEN];;
+    char mac[ETH_ALEN];
 
     char* profile_path;
     char* profile;
@@ -177,7 +185,6 @@ typedef struct clone {
     char* config_path;
     uint16_t vlan;
     uint32_t domID;
-    bool memshared;
 
     // thread stuff
     pthread_t thread;

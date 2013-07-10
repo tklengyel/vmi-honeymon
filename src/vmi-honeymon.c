@@ -73,6 +73,7 @@ void honeymon_init() {
 
 void honeymon_free(honeymon_t* honeymon) {
     if (honeymon != NULL) {
+        g_mutex_clear(&honeymon->lock);
         g_free(honeymon->workdir);
         g_free(honeymon->originsdir);
         g_free(honeymon->honeypotsdir);
@@ -92,6 +93,7 @@ void honeymon_free(honeymon_t* honeymon) {
 honeymon_t* honeymon_quit(honeymon_t* honeymon) {
     if (honeymon->tcp_socket > 0) shutdown(honeymon->tcp_socket, 2);
 
+    g_mutex_lock(&honeymon->lock);
     g_tree_destroy(honeymon->honeypots);
     g_async_queue_push(honeymon->clone_requests,"exit thread");
     pthread_join(honeymon->clone_factory,NULL);

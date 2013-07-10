@@ -58,13 +58,17 @@ void *honeymon_tcp_handle_connection(void *arg) {
             if (clone != NULL) {
 
                 reply = malloc(
-                        snprintf(NULL, 0, "%s,%u,%u\n\r", clone->clone_name, clone->vlan, clone->logIDX) + 1);
-                sprintf(reply, "%s,%u,%u\n\r", clone->clone_name, clone->vlan, clone->logIDX);
+                        snprintf(NULL, 0, "%s,%s,%u,%u\n\r", clone->origin->ip,
+                                clone->origin->mac, clone->vlan, clone->logIDX)
+                                + 1);
+                sprintf(reply, "%s,%s,%u,%u\n\r", clone->origin->ip,
+                        clone->origin->mac, clone->vlan, clone->logIDX);
 
                 honeymon_honeypots_unpause_clones2(NULL, clone, NULL);
 
                 // Replace this clone in the buffer
-                g_async_queue_push(clone->honeymon->clone_requests, strdup(clone->origin_name));
+                g_async_queue_push(clone->honeymon->clone_requests,
+                        strdup(clone->origin_name));
 
             } else {
                 reply = malloc(snprintf(NULL, 0, "-\n\r") + 1);

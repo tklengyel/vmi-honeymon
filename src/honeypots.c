@@ -272,7 +272,7 @@ void* honeymon_honeypot_runner(void *input) {
             sleep_cycle =
                     g_get_monotonic_time() + clone->tscan[clone->cscan] * G_TIME_SPAN_SECOND;clone->cscan++;
 
-                    if (honeymon->membench && clone->memshared) {
+                    if (honeymon->membench) {
                         clone->membench = 1;
                         pthread_attr_t tattr;
                         int ret = pthread_attr_init(&tattr);
@@ -392,6 +392,9 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->profile_path = malloc(
                 snprintf(NULL, 0, "%s/%s.profile", honeymon->originsdir, name)
                         + 1);
+        origin->ip_path = malloc(
+                snprintf(NULL, 0, "%s/%s.ip", honeymon->originsdir, name)
+                        + 1);
 
         unsigned int domID = 0;
         libxl_name_to_domid(honeymon->xen->xl_ctx, name, &domID);
@@ -401,6 +404,8 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         sprintf(origin->config_path, "%s/%s.config", honeymon->originsdir,
                 name);
         sprintf(origin->profile_path, "%s/%s.profile", honeymon->originsdir,
+                name);
+        sprintf(origin->ip_path, "%s/%s.ip", honeymon->originsdir,
                 name);
 
         FILE *test1 = NULL, *test2 = NULL;
@@ -449,6 +454,20 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
             fclose(file);
         } else {
             printf("Profile file is missing\n");
+            honeymon_honeypots_destroy_honeypot_t(origin);
+            return NULL;
+        }
+
+        file = fopen(origin->ip_path, "r");
+        if (file != NULL) {
+            char *p = fgets(origin->ip, INET_ADDRSTRLEN, file);
+            char *nl = strrchr(p, '\r');
+            if (nl) *nl = '\0';
+            nl = strrchr(p, '\n');
+            if (nl) *nl = '\0';
+            fclose(file);
+        } else {
+            printf("IP is missing\n");
             honeymon_honeypots_destroy_honeypot_t(origin);
             return NULL;
         }
@@ -803,8 +822,10 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->config_path);
     g_free(honeypot->profile_path);
     g_free(honeypot->profile);
+    g_free(honeypot->ip_path);
     if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
+    g_mutex_clear(&honeypot->lock);
     g_free(honeypot);
 }
 
