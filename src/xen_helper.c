@@ -264,6 +264,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
             clone_config_path);
 
     // Restore the original contents in the config
+    free(vifs->values[0]);
+    free(disks->values[0]);
     vifs->values[0] = backup_vif;
     disks->values[0] = backup_disk;
 
@@ -691,7 +693,9 @@ void honeymon_xen_save_domconfig(honeymon_t* honeymon,
 
         fprintf(output, "%s", setting->name);
         if (setting->nvalues >= 1) {
+            if(setting->avalues)
             fprintf(output, "=[ \"%s\" ]", *(setting->values));
+            else fprintf(output, "= \"%s\" ", *(setting->values));
         }
         fprintf(output, "\n");
     }
