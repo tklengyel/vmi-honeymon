@@ -823,6 +823,7 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->profile_path);
     g_free(honeypot->profile);
     g_free(honeypot->ip_path);
+    g_free(honeypot->origin_name);
     if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_mutex_clear(&honeypot->lock);

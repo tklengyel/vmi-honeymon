@@ -82,6 +82,7 @@ void honeymon_free(honeymon_t* honeymon) {
         g_free(honeymon->volatility);
         g_free(honeymon->scanconf);
         g_free(honeymon->tcp_if);
+        g_free(honeymon->xen);
         if (honeymon->tcp_init) shutdown(honeymon->tcp_socket, 0);
         g_async_queue_unref(honeymon->clone_requests);
 
