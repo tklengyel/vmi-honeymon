@@ -441,7 +441,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->domID = domID;
         origin->clones = 0; // clones will be updated by honeymon_xen_build_clone_list
         origin->clone_list = g_tree_new_full((GCompareDataFunc) strcmp, NULL,
-                g_free, (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
+                NULL, (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
 
         origin->scans = NULL;
         origin->fschecksum = NULL;
@@ -807,6 +807,8 @@ void honeymon_free_clone(honeymon_clone_t *clone) {
 
 void honeymon_honeypots_destroy_clone_t(honeymon_clone_t *clone) {
     // stop clone thread
+    printf("Clearing honeypot clone: %s\n", clone->clone_name);
+
     g_mutex_lock(&clone->lock);
 
     if (clone->active) {
@@ -816,13 +818,13 @@ void honeymon_honeypots_destroy_clone_t(honeymon_clone_t *clone) {
         pthread_join(clone->thread, NULL);
     }
 
-    libxl_domain_destroy(clone->honeymon->xen->xl_ctx, clone->domID, NULL);
+    //libxl_domain_destroy(clone->honeymon->xen->xl_ctx, clone->domID, NULL);
     honeymon_free_clone(clone);
 }
 
 void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
 
-    //printf("Clearing honeypots: %s\n", honeypot->origin_name);
+    printf("Clearing honeypots: %s\n", honeypot->origin_name);
 
     g_mutex_lock(&honeypot->lock);
     g_free(honeypot->snapshot_path);
