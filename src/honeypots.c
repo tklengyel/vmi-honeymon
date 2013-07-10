@@ -124,23 +124,23 @@ void honeymon_honeypots_build_clone_list(honeymon_t *honeymon) {
 
             if (!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, "..")) continue;
 
-            uint32_t honeypotID = 0, domID = 0;
+            uint16_t vlan = 0, domID = 0;
             char *split = strdup(ep->d_name);
             char *common_name = NULL, *id_s = NULL, *extension = NULL;
             common_name = strtok(split, delim);
             id_s = strtok(NULL, delim);
-            if (id_s != NULL) sscanf(id_s, "%u", &honeypotID);
+            if (id_s != NULL) sscanf(id_s, "%"SCNu16, &vlan);
             extension = strtok(NULL, delim);
             if (common_name != NULL && extension != NULL
-                    && !strcmp(extension, "config") && honeypotID != 0) {
+                    && !strcmp(extension, "config") && vlan != 0) {
 
                 char* clone_name = malloc(
-                        snprintf(NULL, 0, "%s.%u", common_name, honeypotID)
+                        snprintf(NULL, 0, "%s.%u", common_name, vlan)
                                 + 1);
-                sprintf(clone_name, "%s.%u", common_name, honeypotID);
+                sprintf(clone_name, "%s.%u", common_name, vlan);
 
                 honeymon_honeypots_init_clone(honeymon, common_name, clone_name,
-                        0);
+                        vlan);
 
                 free(clone_name);
 
