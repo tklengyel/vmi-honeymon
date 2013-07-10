@@ -22,7 +22,7 @@
 
 bool honeymon_xen_init_interface(honeymon_t* honeymon) {
 
-    honeymon_xen_interface_t *xen = malloc(sizeof(honeymon_xen_interface_t));
+    honeymon_xen_interface_t *xen = g_malloc0(sizeof(honeymon_xen_interface_t));
 
     /* We create an xc interface to test connection to it */
     xen->xc = xc_interface_open(0, 0, 0);
@@ -53,11 +53,11 @@ bool honeymon_xen_init_interface(honeymon_t* honeymon) {
 }
 
 void honeymon_xen_free_interface(honeymon_xen_interface_t* xen) {
-    if (xen != NULL) {
-        if (xen->xsh != NULL) xs_close(xen->xsh);
-        if (xen->xc != NULL) xc_interface_close(xen->xc);
+    if (xen) {
+        if (xen->xl_ctx) libxl_ctx_free(xen->xl_ctx);
         if (xen->xl_logger) xtl_logger_destroy(xen->xl_logger);
-        if (xen->xl_ctx != NULL) libxl_ctx_free(xen->xl_ctx);
+        if (xen->xsh) xs_close(xen->xsh);
+        if (xen->xc) xc_interface_close(xen->xc);
         free(xen);
     }
 }
