@@ -327,11 +327,11 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     ret = CLONE_BUFFER - honeypot->clone_buffer;
 
-    g_mutex_unlock(&honeypot->lock);
-
     printf("Clone %s created\n", clone->clone_name);
 
-    done: free(clone_name);
+    done:
+    g_mutex_unlock(&honeypot->lock);
+    free(clone_name);
     free(disk_clone_path);
     free(clone_config_path);
     free(vlan);
@@ -693,7 +693,7 @@ void honeymon_xen_save_domconfig(honeymon_t* honeymon,
 
         fprintf(output, "%s", setting->name);
         if (setting->nvalues >= 1) {
-            if(setting->avalues)
+            if(setting->avalues > 1)
             fprintf(output, "=[ \"%s\" ]", *(setting->values));
             else fprintf(output, "= \"%s\" ", *(setting->values));
         }

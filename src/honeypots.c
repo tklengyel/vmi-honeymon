@@ -142,6 +142,8 @@ void honeymon_honeypots_build_clone_list(honeymon_t *honeymon) {
                 honeymon_honeypots_init_clone(honeymon, common_name, clone_name,
                         0);
 
+                free(clone_name);
+
             } else {
                 if (extension == NULL || strcmp(extension, "qcow2")) {
                     printf(
@@ -439,7 +441,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->domID = domID;
         origin->clones = 0; // clones will be updated by honeymon_xen_build_clone_list
         origin->clone_list = g_tree_new_full((GCompareDataFunc) strcmp, NULL,
-                NULL, (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
+                g_free, (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
 
         origin->scans = NULL;
         origin->fschecksum = NULL;
@@ -797,6 +799,8 @@ void honeymon_free_clone(honeymon_clone_t *clone) {
         g_free(clone->origin_name);
         g_free(clone->qcow2_path);
         g_free(clone->config_path);
+        g_free(clone->scan_threads);
+        g_free(clone->tscan);
         g_free(clone);
     }
 }
@@ -826,7 +830,6 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->profile_path);
     g_free(honeypot->profile);
     g_free(honeypot->ip_path);
-    g_free(honeypot->origin_name);
     if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_mutex_clear(&honeypot->lock);
