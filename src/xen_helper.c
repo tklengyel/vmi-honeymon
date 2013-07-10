@@ -98,8 +98,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     sscanf(dom, "%u", &domID);
 
     if (domID == INVALID_DOMID) {
-        name = malloc(sizeof(char) * strlen(dom));
-        sprintf(name, "%s", dom);
+        name = g_strdup(dom);
         libxl_name_to_domid(xen->xl_ctx, name, &domID);
         if (domID == INVALID_DOMID) {
             printf("Domain is not running, failed to get domID from name!\n");
@@ -145,7 +144,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         return ret;
     }
 
-    char *original_disk = g_strdup(disks->values[0]);
+    char *backup_disk = disks->values[0];
     char *disk_path = honeymon_xen_first_disk_path(
             (XLU_ConfigList *) disks_masked);
 
@@ -168,7 +167,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     }
 
     vifs = (XLU_ConfigList2 *) vifs_masked;
-    char *original_vif = strdup(vifs->values[0]);
+    char *original_vif = vifs->values[0];
+    char *backup_vif = original_vif;
 
     // Setup clone
     char *disk_clone_path = malloc(
@@ -264,8 +264,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
             clone_config_path);
 
     // Restore the original contents in the config
-    vifs->values[0] = original_vif;
-    disks->values[0] = original_disk;
+    vifs->values[0] = backup_vif;
+    disks->values[0] = backup_disk;
 
     command = malloc(
             snprintf(NULL, 0, "%s restore -p %s %s", XL, clone_config_path,
