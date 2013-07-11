@@ -329,9 +329,8 @@ void* honeymon_honeypot_runner(void *input) {
                     printf("Got signal to pause VM!\n");
                 }
             } else {
-                // Signal was received to end all scans
-                printf("Signal received to end scan\n");
-                break;
+                //Shutdown signal
+                goto done;
             }
         }
 
@@ -339,7 +338,6 @@ void* honeymon_honeypot_runner(void *input) {
     }
 
     final_scan: libxl_domain_pause(honeymon->xen->xl_ctx, clone->domID);
-
     g_mutex_lock(&(clone->scan_lock));
     honeymon_scan_start_all(clone);
 
@@ -809,7 +807,6 @@ void honeymon_honeypots_destroy_clone_t(honeymon_clone_t *clone) {
     g_cond_signal(&(clone->cond));
     pthread_join(clone->thread, NULL);
 
-    //libxl_domain_destroy(clone->honeymon->xen->xl_ctx, clone->domID, NULL);
     honeymon_free_clone(clone);
 }
 
