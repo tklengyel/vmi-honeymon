@@ -195,7 +195,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         return ret;
     }
 
-    char *backup_disk = disks->values[0];
+    char *backup_disk = strdup(disks->values[0]);
     char *disk_path = honeypot->disk_path;
     // Get the first network interface
     XLU_ConfigList *vifs_masked = NULL;
@@ -213,8 +213,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     }
 
     vifs = (XLU_ConfigList2 *) vifs_masked;
-    char *original_vif = vifs->values[0];
-    char *backup_vif = original_vif;
+    char *original_vif = strdup(vifs->values[0]);
+    char *backup_vif = strdup(vifs->values[0]);
 
     // Setup clone
     char *disk_clone_path = malloc(
@@ -282,6 +282,9 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
         elements++;
     }
+
+    free(original_vif);
+    free(vifs->values[0]);
 
     printf("New vif is %s\n", new_vif->str);
     vifs->values[0] = g_string_free(new_vif, FALSE);
