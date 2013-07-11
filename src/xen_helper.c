@@ -125,8 +125,9 @@ char *honeymon_xen_first_disk_path(XLU_Config2 *config) {
         disk_path = strtok_r(NULL, delim, &saveptr);
     }
 
+    char *ret = disk_path?strdup(disk_path):NULL;
     free(s);
-    return disk_path?strdup(disk_path):NULL;
+    return ret;
 }
 
 int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {

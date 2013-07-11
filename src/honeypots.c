@@ -193,8 +193,11 @@ int honeymon_honeypots_list_loop(gpointer key, gpointer value, gpointer data) {
             name, origin->domID, g_tree_nnodes(origin->clone_list));
     else printf("Origin VM: %s. NOT RUNNING!\n", name);
 
-    printf("\tConfig path: %s\n\tSnapshot path: %s\n\tProfile: %s\n",
-            origin->config_path, origin->snapshot_path, origin->profile);
+    printf("\tConfig path: %s\n", origin->config_path);
+    printf("\tSnapshot path: %s\n",origin->snapshot_path);
+    printf("\tProfile: %s\n",origin->profile);
+    printf("\tMAC: %s\n", origin->mac);
+    printf("\tDisk: %s\n", origin->disk_path);
 
     g_tree_foreach(origin->clone_list,
             (GTraverseFunc) honeymon_honeypots_list_loop2, NULL);

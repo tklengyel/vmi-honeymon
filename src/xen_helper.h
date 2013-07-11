@@ -35,7 +35,7 @@ void honeymon_xen_restore(honeymon_t *honeymon, char *option);
 int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom);
 int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom);
 char *honeymon_xen_first_vif_mac(XLU_Config2 *config);
-
+char *honeymon_xen_first_disk_path(XLU_Config2 *config);
 
 void test(honeymon_t *honeymon, char *option);
 
