@@ -62,6 +62,40 @@ void honeymon_xen_free_interface(honeymon_xen_interface_t* xen) {
     }
 }
 
+char *honeymon_xen_first_vif_mac(XLU_Config2 *config) {
+    // Get the first network interface
+    XLU_ConfigList2 *vifs = NULL;
+    int number_of_vifs;
+    if (xlu_cfg_get_list((XLU_Config *) config, "vif", (XLU_ConfigList **)&vifs,
+            &number_of_vifs, 0)) {
+        printf("The VM config didn't contain network configuration line!\n");
+        return NULL;
+    }
+
+    if (number_of_vifs < 1) {
+        printf("No network interfaces are defined in the config!\n");
+        return NULL;
+    }
+
+    char delim2[] = ",=";
+    char *saveptr;
+    char *vif_parse = strtok_r(vifs->values[0], delim2, &saveptr);
+    bool mac = 0;
+
+    while (vif_parse != NULL) {
+        if (mac) {
+            return strdup(vif_parse);
+        }
+
+        if (!strcmp(vif_parse, "mac")) mac = 1;
+        else mac = 0;
+
+        vif_parse = strtok_r(NULL, delim2, &saveptr);
+    }
+
+    return NULL;
+}
+
 char *honeymon_xen_first_disk_path(XLU_ConfigList *disks_masked) {
     // Get the path to the disk
     XLU_ConfigList2 *disks = (XLU_ConfigList2 *) disks_masked;
@@ -187,7 +221,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     sprintf(vlan, ".%u", vlan_id);
 
     printf("Creating clone %s\n\tDisk %s\n\tConfig %s\n\tVLAN %u\n", clone_name,
-            disk_clone_path, clone_config_path, honeymon->vlans);
+            disk_clone_path, clone_config_path, vlan_id);
 
     char *command = malloc(
             snprintf(NULL, 0, "%s create -f qcow2 -b %s %s", QEMUIMG, disk_path,
@@ -215,7 +249,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     char *vif_bridge = strtok_r(original_vif, delim2, &saveptr);
     int elements = 1;
     bool bridge = 0;
-    bool mac = 0;
 
     while (vif_bridge != NULL) {
 
@@ -227,18 +260,11 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
             g_string_append(new_vif, vlan);
         }
 
-        if(mac && !honeypot->mac) {
-            g_strdup(vif_bridge);
-        }
-
         if (elements % 2 == 0) g_string_append(new_vif, ",");
         else g_string_append(new_vif, "=");
 
         if (!strcmp(vif_bridge, "bridge")) bridge = 1;
         else bridge = 0;
-
-        if (!strcmp(vif_bridge, "mac")) mac = 1;
-        else mac = 0;
 
         vif_bridge = strtok_r(NULL, delim2, &saveptr);
 

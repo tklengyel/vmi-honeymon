@@ -155,8 +155,8 @@ typedef struct honeypot {
     XLU_Config2 *config;
 
     // network info
-    char ip[INET_ADDRSTRLEN];;
-    char mac[ETH_ALEN];
+    char ip[INET_ADDRSTRLEN];
+    char *mac;
 
     char* profile_path;
     char* profile;

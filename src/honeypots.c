@@ -421,6 +421,8 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
             return NULL;
         }
 
+        origin->mac = honeymon_xen_first_vif_mac(origin->config);
+
         printf("Checking for %s: ", origin->snapshot_path);
 
         if ((test2 = fopen(origin->snapshot_path, "r")) != NULL) {
@@ -530,7 +532,7 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
 
         // When we reconstruct clones after a restart, we need to update the vlan ids to start from for new clones
         g_mutex_lock(&honeymon->lock);
-        if(honeymon->vlans<vlan) honeymon->vlans = vlan+1;
+        if(honeymon->vlans<=vlan) honeymon->vlans = vlan+1;
         g_mutex_unlock(&honeymon->lock);
 
         if (!clone_info.dying && !clone_info.shutdown) {
@@ -824,6 +826,7 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->profile_path);
     g_free(honeypot->profile);
     g_free(honeypot->ip_path);
+    g_free(honeypot->mac);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_free(honeypot->origin_name);
     g_mutex_clear(&honeypot->lock);

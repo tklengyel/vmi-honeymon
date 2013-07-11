@@ -34,7 +34,8 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom);
 void honeymon_xen_restore(honeymon_t *honeymon, char *option);
 int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom);
 int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom);
-void honeymon_xen_revert_clone(honeymon_t *honeymon, char *name);
+char *honeymon_xen_first_vif_mac(XLU_Config2 *config);
+
 
 void test(honeymon_t *honeymon, char *option);
 
