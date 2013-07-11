@@ -42,7 +42,7 @@ void *honeymon_tcp_handle_connection(void *arg) {
         char *third = strtok_r(NULL, delim, &saveptr);
 
         if (first == NULL) break;
-        else if (!strcmp(first, "hello")) fputs("hi\n\r", fp);
+        else if (!strcmp(first, "hello")) fputs("hi 2.1\n\r", fp);
         else if (!strcmp(first, "free")) {
             uint32_t free_clones = honeymon_honeypots_count_free_clones(
                     honeymon);
@@ -58,11 +58,13 @@ void *honeymon_tcp_handle_connection(void *arg) {
             if (clone != NULL) {
 
                 reply = malloc(
-                        snprintf(NULL, 0, "%s,%s,%u,%u\n\r", clone->origin->ip,
+                        snprintf(NULL, 0, "%s,%s,%s,%u,%u\n\r",
+                                clone->clone_name, clone->origin->ip,
                                 clone->origin->mac, clone->vlan, clone->logIDX)
                                 + 1);
-                sprintf(reply, "%s,%s,%u,%u\n\r", clone->origin->ip,
-                        clone->origin->mac, clone->vlan, clone->logIDX);
+                sprintf(reply, "%s,%s,%s,%u,%u\n\r", clone->clone_name,
+                        clone->origin->ip, clone->origin->mac, clone->vlan,
+                        clone->logIDX);
 
                 honeymon_honeypots_unpause_clones2(NULL, clone, NULL);
 
@@ -81,8 +83,8 @@ void *honeymon_tcp_handle_connection(void *arg) {
             // network event!
 
             char *clone_name = first;
-            char *attacker = second;
-            char *conn_out = third;
+            char *from = second;
+            char *to = third;
 
             honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
                     clone_name);
@@ -91,7 +93,7 @@ void *honeymon_tcp_handle_connection(void *arg) {
             else if (clone->paused) {
                 fputs("paused\n\r", fp);
             } else {
-                printf("Network event going to %s\n", conn_out);
+                printf("Network event: %s -> %s\n", from, to);
                 if (!clone->finish) {
                     if (g_mutex_trylock(&(clone->scan_lock))) {
                         // No scan is running right now, send signal!

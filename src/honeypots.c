@@ -387,7 +387,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
 
         g_mutex_init(&origin->lock);
 
-        origin->origin_name = strdup(name);
+        origin->origin_name = g_strdup(name);
         origin->snapshot_path = malloc(
                 snprintf(NULL, 0, "%s/%s.origin", honeymon->originsdir, name)
                         + 1);
@@ -834,6 +834,7 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->ip_path);
     if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
+    g_free(honeypot->origin_name);
     g_mutex_clear(&honeypot->lock);
     g_free(honeypot);
 }

@@ -48,7 +48,7 @@ void honeymon_init() {
 #endif
 
     honeymon->honeypots = g_tree_new_full((GCompareDataFunc) strcmp, NULL,
-            (GDestroyNotify) free,
+            NULL,
             (GDestroyNotify) honeymon_honeypots_destroy_honeypot_t);
 
     honeymon->log = g_malloc0(sizeof(honeymon_log_interface_t));
