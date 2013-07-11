@@ -530,7 +530,7 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
 
         // When we reconstruct clones after a restart, we need to update the vlan ids to start from for new clones
         g_mutex_lock(&honeymon->lock);
-        if(honeymon->vlans<vlan) honeymon->vlans = vlan;
+        if(honeymon->vlans<vlan) honeymon->vlans = vlan+1;
         g_mutex_unlock(&honeymon->lock);
 
         if (!clone_info.dying && !clone_info.shutdown) {

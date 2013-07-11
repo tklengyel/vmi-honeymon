@@ -94,7 +94,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     int sysret;
     int ret = -1;
 
-    printf("Checking for %s..\n", dom);
+    printf("Checking for %s ..\n", dom);
     sscanf(dom, "%u", &domID);
 
     if (domID == INVALID_DOMID) {
