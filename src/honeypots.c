@@ -361,11 +361,7 @@ void* honeymon_honeypot_clone_factory(void *input) {
         char *honeypot = g_async_queue_pop(honeymon->clone_requests);
         if (!strcmp(honeypot, "exit thread")) break;
 
-        printf("Factory request: %s\n", honeypot);
-
         honeymon_xen_clone_vm(honeymon, honeypot);
-
-        printf("Factory request finished: %s\n", honeypot);
 
         free(honeypot);
     }
@@ -426,6 +422,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         }
 
         origin->mac = honeymon_xen_first_vif_mac(origin->config);
+        origin->disk_path = honeymon_xen_first_disk_path(origin->config);
 
         printf("Checking for %s: ", origin->snapshot_path);
 
@@ -831,6 +828,7 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->profile);
     g_free(honeypot->ip_path);
     g_free(honeypot->mac);
+    g_free(honeypot->disk_path);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_free(honeypot->origin_name);
     g_mutex_clear(&honeypot->lock);

@@ -151,6 +151,7 @@ typedef struct honeypot {
     char* snapshot_path;
     char* config_path;
     char* ip_path;
+    char *disk_path;
 
     XLU_Config2 *config;
 

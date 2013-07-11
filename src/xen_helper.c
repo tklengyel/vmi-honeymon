@@ -99,12 +99,22 @@ char *honeymon_xen_first_vif_mac(XLU_Config2 *config) {
     return ret;
 }
 
-char *honeymon_xen_first_disk_path(XLU_ConfigList *disks_masked) {
+char *honeymon_xen_first_disk_path(XLU_Config2 *config) {
     // Get the path to the disk
-    XLU_ConfigList2 *disks = (XLU_ConfigList2 *) disks_masked;
 
-    char *ret = NULL;
-    disks = (XLU_ConfigList2 *) disks_masked;
+    XLU_ConfigList2 *disks = NULL;
+    int number_of_disks;
+    if (xlu_cfg_get_list((XLU_Config *) config, "vif",
+            (XLU_ConfigList **) &disks, &number_of_disks, 0)) {
+        printf("The VM config didn't contain disk configuration line!\n");
+        return NULL;
+    }
+
+    if (number_of_disks < 1) {
+        printf("No disks are defined in the config!\n");
+        return NULL;
+    }
+
     char delim[] = ":,";
     char *saveptr = NULL;
     char *s = strdup(disks->values[0]);
@@ -116,7 +126,7 @@ char *honeymon_xen_first_disk_path(XLU_ConfigList *disks_masked) {
     }
 
     free(s);
-    return strdup(disk_path);
+    return disk_path?strdup(disk_path):NULL;
 }
 
 int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
@@ -185,12 +195,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     }
 
     char *backup_disk = disks->values[0];
-    char *disk_path = honeymon_xen_first_disk_path(
-            (XLU_ConfigList *) disks_masked);
-
-    if (disk_path == NULL) return 0;
-    else printf("The original disk path is %s\n", disk_path);
-
+    char *disk_path = honeypot->disk_path;
     // Get the first network interface
     XLU_ConfigList *vifs_masked = NULL;
     XLU_ConfigList2 *vifs = NULL;
