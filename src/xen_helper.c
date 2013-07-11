@@ -64,6 +64,7 @@ void honeymon_xen_free_interface(honeymon_xen_interface_t* xen) {
 
 char *honeymon_xen_first_vif_mac(XLU_Config2 *config) {
     // Get the first network interface
+    char *ret = NULL;
     XLU_ConfigList2 *vifs = NULL;
     int number_of_vifs;
     if (xlu_cfg_get_list((XLU_Config *) config, "vif", (XLU_ConfigList **)&vifs,
@@ -79,12 +80,13 @@ char *honeymon_xen_first_vif_mac(XLU_Config2 *config) {
 
     char delim2[] = ",=";
     char *saveptr;
-    char *vif_parse = strtok_r(vifs->values[0], delim2, &saveptr);
+    char *b = strdup(vifs->values[0]);
+    char *vif_parse = strtok_r(b, delim2, &saveptr);
     bool mac = 0;
 
     while (vif_parse != NULL) {
         if (mac) {
-            return strdup(vif_parse);
+            ret = strdup(vif_parse);
         }
 
         if (!strcmp(vif_parse, "mac")) mac = 1;
@@ -93,7 +95,8 @@ char *honeymon_xen_first_vif_mac(XLU_Config2 *config) {
         vif_parse = strtok_r(NULL, delim2, &saveptr);
     }
 
-    return NULL;
+    free(b);
+    return ret;
 }
 
 char *honeymon_xen_first_disk_path(XLU_ConfigList *disks_masked) {
