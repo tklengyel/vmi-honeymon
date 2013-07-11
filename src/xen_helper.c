@@ -103,17 +103,20 @@ char *honeymon_xen_first_disk_path(XLU_ConfigList *disks_masked) {
     // Get the path to the disk
     XLU_ConfigList2 *disks = (XLU_ConfigList2 *) disks_masked;
 
+    char *ret = NULL;
     disks = (XLU_ConfigList2 *) disks_masked;
     char delim[] = ":,";
     char *saveptr = NULL;
-    char *disk_path = strtok_r((disks->values[0]), delim, &saveptr);
+    char *s = strdup(disks->values[0]);
+    char *disk_path = strtok_r(s, delim, &saveptr);
 
     while (disk_path != NULL) {
         if ((int) disk_path[0] == 47) break;
         disk_path = strtok_r(NULL, delim, &saveptr);
     }
 
-    return disk_path;
+    free(s);
+    return strdup(disk_path);
 }
 
 int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {

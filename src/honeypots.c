@@ -361,7 +361,11 @@ void* honeymon_honeypot_clone_factory(void *input) {
         char *honeypot = g_async_queue_pop(honeymon->clone_requests);
         if (!strcmp(honeypot, "exit thread")) break;
 
+        printf("Factory request: %s\n", honeypot);
+
         honeymon_xen_clone_vm(honeymon, honeypot);
+
+        printf("Factory request finished: %s\n", honeypot);
 
         free(honeypot);
     }
