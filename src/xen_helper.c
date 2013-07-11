@@ -249,6 +249,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     // Update config
 
     // Replace disk config
+    free(disks->values[0]);
     disks->values[0] = malloc(
             snprintf(NULL, 0, "tap:qcow2:%s,xvda,w", disk_clone_path) + 1);
     sprintf(disks->values[0], "tap:qcow2:%s,xvda,w", disk_clone_path);
