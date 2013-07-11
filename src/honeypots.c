@@ -135,8 +135,7 @@ void honeymon_honeypots_build_clone_list(honeymon_t *honeymon) {
                     && !strcmp(extension, "config") && vlan != 0) {
 
                 char* clone_name = malloc(
-                        snprintf(NULL, 0, "%s.%u", common_name, vlan)
-                                + 1);
+                        snprintf(NULL, 0, "%s.%u", common_name, vlan) + 1);
                 sprintf(clone_name, "%s.%u", common_name, vlan);
 
                 honeymon_honeypots_init_clone(honeymon, common_name, clone_name,
@@ -262,38 +261,39 @@ void* honeymon_honeypot_runner(void *input) {
 
         if (clone->cscan >= clone->nscans && clone->nscans > 0) {
             printf(
-                    "Clone is still active but ran out of scheduled scans (%i/%i).\n",
+                    "Clone is still active but ran out of scheduled scans (%i/%i). Switch to network signal.\n",
                     clone->cscan, clone->nscans);
-            goto destroy;
+            clone->nscans = 0;
         }
 
-        /* Convert from timeval to timespec */
-
         if (clone->nscans > 0) {
+            //wtf
+            sleep_cycle = g_get_monotonic_time();
+            sleep_cycle += clone->tscan[clone->cscan] * G_TIME_SPAN_SECOND;
+            clone->cscan++;
 
-            sleep_cycle =
-                    g_get_monotonic_time() + clone->tscan[clone->cscan] * G_TIME_SPAN_SECOND;clone->cscan++;
+            if (honeymon->membench) {
+                clone->membench = 1;
+                pthread_attr_t tattr;
+                int ret = pthread_attr_init(&tattr);
+                ret = pthread_attr_setdetachstate(&tattr,
+                        PTHREAD_CREATE_DETACHED);
+                pthread_create(&(clone->membench_thread), &tattr,
+                        honeymon_honeypot_membench, (void *) clone);
+                pthread_attr_destroy(&tattr);
+            }
 
-                    if (honeymon->membench) {
-                        clone->membench = 1;
-                        pthread_attr_t tattr;
-                        int ret = pthread_attr_init(&tattr);
-                        ret = pthread_attr_setdetachstate(&tattr,
-                                PTHREAD_CREATE_DETACHED);
-                        pthread_create(&(clone->membench_thread), &tattr,
-                                honeymon_honeypot_membench, (void *) clone);
-                        pthread_attr_destroy(&tattr);
-                    }
+            rc = g_cond_wait_until(&(clone->cond), &(clone->lock), sleep_cycle);
 
-                    rc = g_cond_wait_until(&(clone->cond), &(clone->lock), sleep_cycle);
+            printf("Got out of timed cond wait!\n");
+        } else {
 
-                    printf("Got out of timed cond wait!\n");
-                } else {
-                    printf(
-                            "No scan schedule was defined, waiting for network event signal.\n");
-                    g_cond_wait(&(clone->cond), &(clone->lock));
-                    rc = TRUE;
-                }
+            printf(
+                    "No scan schedule was defined, waiting for network event signal.\n");
+            g_cond_wait(&(clone->cond), &(clone->lock));
+            rc = TRUE;
+
+        }
 
         if (rc == FALSE) {
             // Regular scan scheduled
@@ -343,8 +343,7 @@ void* honeymon_honeypot_runner(void *input) {
     g_mutex_lock(&(clone->scan_lock));
     honeymon_scan_start_all(clone);
 
-    destroy:
-    printf("Destroying clone %s\n",clone->clone_name);
+    printf("Destroying clone %s\n", clone->clone_name);
     libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
     g_mutex_lock(&clone->origin->lock);
     g_tree_steal(clone->origin->clone_list, clone->clone_name);
@@ -352,19 +351,17 @@ void* honeymon_honeypot_runner(void *input) {
     g_mutex_unlock(&clone->origin->lock);
     honeymon_free_clone(clone);
 
-    done:
-    printf("Clone thread is exiting.\n");
+    done: printf("Clone thread is exiting.\n");
     pthread_exit(0);
     return NULL;
 }
 
 void* honeymon_honeypot_clone_factory(void *input) {
 
-    honeymon_t *honeymon = (honeymon_t *)input;
+    honeymon_t *honeymon = (honeymon_t *) input;
     while (1) {
         char *honeypot = g_async_queue_pop(honeymon->clone_requests);
-        if(!strcmp(honeypot,"exit thread"))
-            break;
+        if (!strcmp(honeypot, "exit thread")) break;
 
         honeymon_xen_clone_vm(honeymon, honeypot);
 
@@ -398,8 +395,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
                 snprintf(NULL, 0, "%s/%s.profile", honeymon->originsdir, name)
                         + 1);
         origin->ip_path = malloc(
-                snprintf(NULL, 0, "%s/%s.ip", honeymon->originsdir, name)
-                        + 1);
+                snprintf(NULL, 0, "%s/%s.ip", honeymon->originsdir, name) + 1);
 
         unsigned int domID = 0;
         libxl_name_to_domid(honeymon->xen->xl_ctx, name, &domID);
@@ -410,8 +406,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
                 name);
         sprintf(origin->profile_path, "%s/%s.profile", honeymon->originsdir,
                 name);
-        sprintf(origin->ip_path, "%s/%s.ip", honeymon->originsdir,
-                name);
+        sprintf(origin->ip_path, "%s/%s.ip", honeymon->originsdir, name);
 
         FILE *test1 = NULL, *test2 = NULL;
         printf("Checking for %s: ", origin->config_path);
@@ -420,7 +415,8 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
             printf("OK\n");
             fclose(test1);
             origin->config = (XLU_Config2 *) xlu_cfg_init(stderr, "cmdline");
-            xlu_cfg_readfile((XLU_Config *) origin->config, origin->config_path);
+            xlu_cfg_readfile((XLU_Config *) origin->config,
+                    origin->config_path);
         } else {
             printf("missing!\n");
             honeymon_honeypots_destroy_honeypot_t(origin);
@@ -759,7 +755,8 @@ gboolean honeymon_honeypots_get_random3(gpointer key, honeymon_clone_t *clone,
 gboolean honeymon_honeypots_get_random2(gpointer key,
         honeymon_honeypot_t *origin, GSList **free_clones) {
 
-    if (origin->clone_buffer && (!origin->max_clones || origin->clones <= origin->max_clones)) {
+    if (origin->clone_buffer
+            && (!origin->max_clones || origin->clones <= origin->max_clones)) {
         g_tree_foreach(origin->clone_list,
                 (GTraverseFunc) honeymon_honeypots_get_random3, free_clones);
     }
@@ -769,8 +766,7 @@ gboolean honeymon_honeypots_get_random2(gpointer key,
 honeymon_clone_t *honeymon_honeypots_get_random(honeymon_t *honeymon) {
     GSList *free_clones = NULL;
     g_tree_foreach(honeymon->honeypots,
-            (GTraverseFunc) honeymon_honeypots_get_random2,
-            &free_clones);
+            (GTraverseFunc) honeymon_honeypots_get_random2, &free_clones);
 
     guint count = g_slist_length(free_clones);
     //printf("Got %i free clones\n", count);
@@ -809,30 +805,23 @@ void honeymon_honeypots_destroy_clone_t(honeymon_clone_t *clone) {
     // stop clone thread
     printf("Clearing honeypot clone: %s\n", clone->clone_name);
 
-    g_mutex_lock(&clone->lock);
-
-    if (clone->active) {
-        clone->active = 0;
-        g_mutex_unlock(&clone->lock);
-        g_cond_signal(&(clone->cond));
-        pthread_join(clone->thread, NULL);
-    }
+    clone->active=false;
+    g_cond_signal(&(clone->cond));
+    pthread_join(clone->thread, NULL);
 
     //libxl_domain_destroy(clone->honeymon->xen->xl_ctx, clone->domID, NULL);
     honeymon_free_clone(clone);
 }
 
 void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
-
     printf("Clearing honeypots: %s\n", honeypot->origin_name);
 
-    g_mutex_lock(&honeypot->lock);
+    if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     g_free(honeypot->snapshot_path);
     g_free(honeypot->config_path);
     g_free(honeypot->profile_path);
     g_free(honeypot->profile);
     g_free(honeypot->ip_path);
-    if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_free(honeypot->origin_name);
     g_mutex_clear(&honeypot->lock);

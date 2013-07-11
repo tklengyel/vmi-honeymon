@@ -108,10 +108,6 @@ typedef struct honeymon {
     bool tcp_init;
     int tcp_socket;
 
-    GSList* revert_queue;
-    pthread_mutex_t revert_queue_lock;
-    pthread_cond_t revert_queue_cond;
-
     bool guestfs_enable;
 
     bool membench;

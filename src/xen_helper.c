@@ -492,7 +492,7 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
     char ip[INET_ADDRSTRLEN];
     printf("Please enter the IP of this VM: ");
     fflush(stdout);
-    p = fgets(ip, sizeof(INET_ADDRSTRLEN), stdin);
+    p = fgets(ip, INET_ADDRSTRLEN, stdin);
     nl = strrchr(p, '\r');
     if (nl) *nl = '\0';
     nl = strrchr(p, '\n');
