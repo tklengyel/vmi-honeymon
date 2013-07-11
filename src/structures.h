@@ -53,7 +53,7 @@ typedef struct xen_domconfig_raw {
 typedef struct log_interface {
 
     pthread_mutex_t log_IDX_lock;
-    uint64_t log_IDX;
+    uint32_t log_IDX;
 
     pthread_mutex_t mysql_lock;
     bool mysql_enabled;
@@ -199,7 +199,7 @@ typedef struct clone {
     uint32_t scan_initiator; //0=scheduled, 1=network event, 2=timeout
 
     // log IDX
-    uint64_t logIDX;
+    uint32_t logIDX;
     uint32_t start_time;
 
     // memory benchmark
