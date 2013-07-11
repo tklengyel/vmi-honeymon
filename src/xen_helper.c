@@ -104,7 +104,7 @@ char *honeymon_xen_first_disk_path(XLU_Config2 *config) {
 
     XLU_ConfigList2 *disks = NULL;
     int number_of_disks;
-    if (xlu_cfg_get_list((XLU_Config *) config, "vif",
+    if (xlu_cfg_get_list((XLU_Config *) config, "disk",
             (XLU_ConfigList **) &disks, &number_of_disks, 0)) {
         printf("The VM config didn't contain disk configuration line!\n");
         return NULL;
