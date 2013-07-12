@@ -79,7 +79,20 @@ void *honeymon_tcp_handle_connection(void *arg) {
 
             fputs(reply, fp);
             free(reply);
-        } else if (third != NULL) {
+        } else if(!strcmp(first, "close") && !second) {
+            honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
+                    second);
+            if (clone) {
+                clone->finish = 1;
+                if (g_mutex_trylock(&(clone->scan_lock))) {
+                    // No scan is running right now, send signal!
+                    g_cond_signal(&(clone->cond));
+                    g_mutex_unlock(&(clone->scan_lock));
+                }
+            } else {
+                printf("Clone %s doesn't exist!\n",second);
+            }
+        } else if (!first && !second && !third) {
             // network event!
 
             char *clone_name = first;

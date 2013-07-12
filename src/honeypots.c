@@ -261,6 +261,7 @@ void* honeymon_honeypot_runner(void *input) {
         }
 
         if (!clone->active) goto done;
+        if (clone->finish) goto final_scan;
 
         if (clone->cscan >= clone->nscans && clone->nscans > 0) {
             printf(
