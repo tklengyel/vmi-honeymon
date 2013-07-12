@@ -83,6 +83,7 @@ void *honeymon_tcp_handle_connection(void *arg) {
             honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon,
                     second);
             if (clone) {
+                printf("Got signal to close clone %s\n",second);
                 clone->finish = 1;
                 if (g_mutex_trylock(&(clone->scan_lock))) {
                     // No scan is running right now, send signal!
