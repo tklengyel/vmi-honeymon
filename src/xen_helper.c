@@ -1,3 +1,23 @@
+/*
+ * This file is part of the VMI-Honeymon project.
+ *
+ * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
+ *
+ * VMI-Honeymon is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -210,7 +230,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     if (honeymon->workdir == NULL) {
         printf("You need to set a workdir for that!\n");
-        return -1;
+        return ret;
     }
     if(-1 == get_dom_info(xen, dom, &domID, &name)) {
     	return ret;
@@ -233,11 +253,11 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     XLU_ConfigList2 *disks = NULL, *vifs = NULL;
 
     if(-1 == get_config_disks(honeypot->config, &disks)) {
-    	return ret;
+    	goto done;
     }
 
 	if (-1 == get_config_vifs(honeypot->config, &vifs)) {
-		return ret;
+		goto done;
 	}
 
     char *backup_disk = strdup(disks->values[0]);
@@ -384,10 +404,10 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     done:
     g_mutex_unlock(&honeypot->lock);
-    free(clone_name);
-    free(clone_config_path);
-    free(vlan);
-    free(name);
+    g_free(clone_name);
+    g_free(clone_config_path);
+    g_free(vlan);
+    g_free(name);
 
     return ret;
 }

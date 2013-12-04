@@ -8,7 +8,7 @@
 #define GUESTFS_HASH_TYPE "SHA1"
 #define CLONE_BUFFER 5
 #define MIN_VLAN 10
-#define VIF_APPEND ",script=vif-openvswitch,backend=openvswitch"
+#define VIF_APPEND "script=vif-openvswitch,backend=openvswitch"
 
 /******************************************/
 
