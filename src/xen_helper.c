@@ -259,7 +259,10 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
             clone_config_path, vlan_id);
 
     // Create LVM2 disk CoW clone
-    lvm_lv_snapshot(honeypot->lv, clone_name, LVM_MAX_SNAP_SIZE);
+    if(!lvm_lv_snapshot(honeypot->lv, clone_name, lvm_lv_get_size(honeypot->lv))) {
+        printf("Failed to create LVM2 snapshot of %s with name %s\n", lvm_lv_get_name(honeypot->lv), clone_name);
+        goto done;
+    }
 
     // Update config
 
@@ -296,6 +299,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     free(original_vif);
     free(vifs->values[0]);
 
+    g_string_append(new_vif, VIF_APPEND);
     printf("New vif is %s\n", new_vif->str);
     vifs->values[0] = g_string_free(new_vif, FALSE);
 

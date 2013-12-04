@@ -540,6 +540,9 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
         clone->clone_name = strdup(clone_name);
 
         clone->clone_lv = lvm_lv_from_name(origin->vg, clone->clone_name);
+        if(!clone->clone_lv) {
+
+        }
 
         clone->config_path = malloc(
                 snprintf(NULL, 0, "%s/%s.config", honeymon->honeypotsdir,

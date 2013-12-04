@@ -1,12 +1,19 @@
 #ifndef STRUCTURES_H
 #define STRUCTURES_H
 
-#define LIBXL_API_VERSION 0x040300
-#define INVALID_DOMID ~(uint32_t)0
+/*
+ * These are some internal definitions used to configure various aspects of VMI-Honeymon
+ * TODO: Convert these to input parameters
+ */
 #define GUESTFS_HASH_TYPE "SHA1"
 #define CLONE_BUFFER 5
 #define MIN_VLAN 10
-#define LVM_MAX_SNAP_SIZE 0
+#define VIF_APPEND ",script=vif-openvswitch,backend=openvswitch"
+
+/******************************************/
+
+#define LIBXL_API_VERSION 0x040300
+#define INVALID_DOMID ~(uint32_t)0
 
 #include <config.h>
 #include <stdio.h>
