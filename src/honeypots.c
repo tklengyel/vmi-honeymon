@@ -390,9 +390,6 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->config_path = malloc(
                 snprintf(NULL, 0, "%s/%s.config", honeymon->honeypotsdir, name)
                         + 1);
-        origin->profile_path = malloc(
-                snprintf(NULL, 0, "%s/%s.profile", honeymon->originsdir, name)
-                        + 1);
         origin->ip_path = malloc(
                 snprintf(NULL, 0, "%s/%s.ip", honeymon->originsdir, name) + 1);
 
@@ -402,8 +399,6 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         sprintf(origin->snapshot_path, "%s/%s.origin", honeymon->originsdir,
                 name);
         sprintf(origin->config_path, "%s/%s.config", honeymon->originsdir,
-                name);
-        sprintf(origin->profile_path, "%s/%s.profile", honeymon->originsdir,
                 name);
         sprintf(origin->ip_path, "%s/%s.ip", honeymon->originsdir, name);
 
@@ -432,7 +427,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->vg = lvm_vg_open(honeymon->lvm, origin->vg_name, "w", 0);
         origin->lv = lvm_lv_from_name(origin->vg, origin->lv_name);
 
-        printf("VG: %s LV: %s\n", origin->vg_name, origin->lv_name);
+        printf("Checking for LVM2 VG: %s LV: %s\n", origin->vg_name, origin->lv_name);
 
         printf("Checking for %s: ", origin->snapshot_path);
 
@@ -452,25 +447,8 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
 
         origin->scans = NULL;
         origin->fschecksum = NULL;
-        origin->profile = NULL;
 
-        FILE *file = fopen(origin->profile_path, "r");
-        if (file != NULL) {
-            char line[128];
-            char *p = fgets(line, 128, file);
-            char *nl = strrchr(p, '\r');
-            if (nl) *nl = '\0';
-            nl = strrchr(p, '\n');
-            if (nl) *nl = '\0';
-            origin->profile = strdup(line);
-            fclose(file);
-        } else {
-            printf("Profile file is missing\n");
-            honeymon_honeypots_destroy_honeypot_t(origin);
-            return NULL;
-        }
-
-        file = fopen(origin->ip_path, "r");
+        FILE *file = fopen(origin->ip_path, "r");
         if (file != NULL) {
             char *p = fgets(origin->ip, INET_ADDRSTRLEN, file);
             char *nl = strrchr(p, '\r');
@@ -827,7 +805,6 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     g_free(honeypot->snapshot_path);
     g_free(honeypot->config_path);
-    g_free(honeypot->profile_path);
     g_free(honeypot->profile);
     g_free(honeypot->ip_path);
     g_free(honeypot->mac);

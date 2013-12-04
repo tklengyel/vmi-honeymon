@@ -205,7 +205,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     honeymon_honeypot_t *honeypot = NULL;
     uint32_t domID = INVALID_DOMID;
     char* name = NULL;
-
     char* command = NULL;
     int ret = -1;
 
@@ -259,10 +258,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     printf("Creating clone %s\n\tConfig %s\n\tVLAN %u\n", clone_name,
             clone_config_path, vlan_id);
 
-
-    //TODO LVM2
-    //const lv_t lv;
-    //lvm_lv_snapshot(lv, NULL, 1);
+    // Create LVM2 disk CoW clone
+    lvm_lv_snapshot(honeypot->lv, clone_name, LVM_MAX_SNAP_SIZE);
 
     // Update config
 
@@ -568,10 +565,9 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
 
 #endif
 
-    g_tree_insert(honeymon->honeypots, honeypot->origin_name, honeypot);
-
     printf("Done!\n");
 
+    free(name);
     free(output);
     free(output_config);
     free(output_profile);

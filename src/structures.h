@@ -6,6 +6,7 @@
 #define GUESTFS_HASH_TYPE "SHA1"
 #define CLONE_BUFFER 5
 #define MIN_VLAN 10
+#define LVM_MAX_SNAP_SIZE 0
 
 #include <config.h>
 #include <stdio.h>
