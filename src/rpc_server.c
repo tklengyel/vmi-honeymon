@@ -98,9 +98,9 @@ const method[__MAX_RPC_FUNCTIONS] = {
 	[RPC_GET_RANDOM_CLONE] =
 		{ 	.methodName = "get_random_clone",
 			.methodFunction = &rpc_get_random_clone },
-	[RPC_GET_RANDOM_CLONE] =
+	[RPC_STOP_CLONE] =
 		{ 	.methodName = "stop_clone",
-				.methodFunction = &rpc_stop_clone },
+			.methodFunction = &rpc_stop_clone },
 };
 
 /******************************************************************************/

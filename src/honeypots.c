@@ -431,6 +431,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->vg_name = g_strdup(disk_config_details[2]);
         origin->lv_name = g_strdup(disk_config_details[3]);
         g_strfreev(disk_config_details);
+        free(disk_config);
 
         origin->vg = lvm_vg_open(honeymon->lvm, origin->vg_name, "w", 0);
         origin->lv = lvm_lv_from_name(origin->vg, origin->lv_name);

@@ -248,7 +248,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     uint16_t vlan_id = honeymon->vlans;
     honeymon->vlans++;
     if (honeymon->vlans < MIN_VLAN) honeymon->vlans += MIN_VLAN;
-    g_mutex_unlock(&honeymon->lock);
 
     XLU_ConfigList2 *disks = NULL, *vifs = NULL;
 
@@ -385,10 +384,13 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
         page--;
 
-        if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle)) continue;
-        if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle)) continue;
+        if (xc_memshr_nominate_gfn(xen->xc, domID, page, &shandle))
+        	continue;
+        if (xc_memshr_nominate_gfn(xen->xc, cloneID, page, &chandle))
+        	continue;
         if (xc_memshr_share_gfns(xen->xc, domID, page, shandle, cloneID, page,
-                chandle)) continue;
+                chandle))
+        	continue;
 
         shared++;
     }
@@ -404,6 +406,8 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     done:
     g_mutex_unlock(&honeypot->lock);
+    g_mutex_unlock(&honeymon->lock);
+
     g_free(clone_name);
     g_free(clone_config_path);
     g_free(vlan);

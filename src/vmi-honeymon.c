@@ -118,6 +118,8 @@ honeymon_t* honeymon_quit(honeymon_t* honeymon) {
 	xmlrpc_server_abyss_terminate(&env, honeymon->rpc_server);
 	xmlrpc_env_clean(&env);
 	pthread_join(honeymon->rpc_server_thread, NULL);
+	g_mutex_clear(&honeymon->rpc_lock);
+	g_cond_clear(&honeymon->rpc_cond);
 #endif
 
     honeymon_free(honeymon);
