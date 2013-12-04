@@ -51,7 +51,6 @@ AM_CONDITIONAL([HARDENING], [test x$hardening = xyes])
 HARDEN_CFLAGS=""
 HARDEN_LDFLAGS=""
 AS_IF([test x"$hardening" != x"no"], [
-  AC_MSG_NOTICE([************ RUNNING AUTOHARDEN **************])  
   check_cc_cxx_flag([-fno-strict-overflow], [HARDEN_CFLAGS="$HARDEN_CFLAGS -fno-strict-overflow"])
 
 #  This one will likely succeed, even on platforms where it does nothing.
@@ -89,8 +88,6 @@ CXX="$saved_CXX"
 LD="$saved_LD"
 # AUTOHARDEN END
 
-AC_MSG_NOTICE([************ CHECKING STANDARD LIBS AND HEADERS **************])
-
 AC_HEADER_STDC
 AC_CHECK_HEADERS([fcntl.h malloc.h stdio.h stdlib.h string.h sys/time.h sys/mman.h syslog.h unistd.h errno.h pthread.h])
 
@@ -111,103 +108,10 @@ PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2
 AC_CHECK_LIB(glib-2.0, [g_malloc0, g_tree_lookup], [], [AC_ERROR([glib-2.0 library is not functional!])]) 
 AC_CHECK_LIB(pthread, pthread_create, [], [AC_ERROR([Pthread library is not functional!])])
 
-#AC_PATH_PROG(XML2_CONFIG, xml2-config)
-#if test "x$XML2_CONFIG" != "x"; then
-#	XML2_LIBS=$($XML2_CONFIG --libs)
-#	XML2_CFLAGS=$($XML2_CONFIG --cflags)
-#	AC_DEFINE(HAVE_XML2, 1, "XML2 library found")
-#	AC_SUBST(XML2_LIBS)
-#	AC_SUBST(XML2_CFLAGS)
-#else
-#	AC_ERROR([XML2 library is missing! (libxml2-dev)])
-#fi
+PKG_CHECK_MODULES([LibVMI], [libvmi], [], [AC_ERROR([LibVMI not found])])
 
-AC_MSG_NOTICE([************ CHECKING VOLATILITY PREREQUISITES **************])
-
-# Check for Python
-AM_PATH_PYTHON([2.6])
-if test "xPYTHON" != "x"; then
-	AC_DEFINE_UNQUOTED(PYTHON, "$PYTHON", "Python found")
-else
-	AC_ERROR([Python was not found on the system, Volatility won't work without it!])
-fi
-
-# Check for LibVMI
-#AC_CHECK_HEADER([libvmi/libvmi.h], [], [AC_ERROR([LibVMI was not found on the system, 
-#Volatility won't work without it!])])
-
-#AC_CHECK_LIB(vmi, vmi_init, [], [AC_ERROR([LibVMI library unusable!])])
-
-AX_PYTHON_MODULE([pyvmi], [AC_ERROR([PyVMI is not installed!])])
-
-AC_PATH_PROG(VOLATILITY, vol.py)
-
-if test "x$VOLATILITY" != "x"; then
-	AC_DEFINE_UNQUOTED(VOLATILITY, "$VOLATILITY", "Volatility vol.py found")
-	AC_MSG_NOTICE([Volatility vol.py found at $VOLATILITY])
-else
-	AC_MSG_NOTICE([** Volatility vol.py was not found in your PATH, you will need to define it manually!])
-fi
-
-
-
-AC_MSG_NOTICE([************ CHECKING VMI-HONEYMON PREREQUISITES ************])
-
-AC_PATH_PROG(GREP, grep)
-if test "x$GREP" != "x"; then
-        AC_DEFINE_UNQUOTED(GREP, "$GREP", "grep found")
-else
-        AC_ERROR([grep not found!])
-fi
-
-# Check for blktap-dkms
-AC_PATH_PROG(DKMS, dkms)
-if test "x$DKMS" != "x"; then
-	BLKTAP_INSTALLED=$($DKMS status -m blktap)
-	if test "x$BLKTAP_INSTALLED" != "x"; then
-		AC_PATH_PROG(LSMOD, lsmod)
-		BLKTAP_LOADED=$($LSMOD | $GREP blktap)
-		if test "x$BLKTAP_LOADED" != "x"; then
-
-			# Get qemu-img or qemu-img-xen path to create qcow2 images automatically with
-			AC_PATH_PROG(QEMUIMG, qemu-img)
-			if test "x$QEMUIMG" != "x"; then
-				AC_DEFINE_UNQUOTED(QEMUIMG, "$QEMUIMG", "qemu-img found")
-			else
-				AC_PATH_PROG(QEMUIMGXEN, qemu-img-xen)
-				if test "x$QEMUIMGXEN" != "x"; then
-					AC_DEFINE_UNQUOTED(QEMUIMG, "$QEMUIMGXEN", "qemu-img-xen found")
-				else
-					AC_ERROR([qemu-img nor qemu-img-xen was found. Is it in your \$PATH?])
-				fi
-			fi
-
-			AC_MSG_NOTICE([Blktap kernel module is present, enabling Qcow2 filesystem format])
-			AC_DEFINE(HAVE_BLKTAP, 1, "Blktap found and ready")
-		else
-			AC_ERROR([*** Blktap dynamic kernel module is installed, but not loaded! Run "modprobe blktap" and "echo blktap >> /etc/modules"!])
-		fi
-	else
-		AC_ERROR([*** No blktap module found with dkms. Did you install blktap-dksm?])
-	fi
-else
-	AC_ERROR([*** DKMS is not found. Did you install blktap-dkms and is dkms in your \$PATH?])
-fi
-
-AC_PATH_PROG(AWK, awk)
-if test "x$AWK" != "x"; then
-        AC_DEFINE_UNQUOTED(AWK, "$AWK", "awk found")
-else
-        AC_ERROR([awk not found!])
-fi
-
-# Check for Xenlight
-AC_PATH_PROG(XL, xl)
-if test "x$XL" != "x"; then
-	AC_DEFINE_UNQUOTED(XL, "$XL", "XL path")
-else
-	AC_ERROR([XL was not found!])
-fi
+AC_CHECK_HEADER([lvm2app.h], [], [AC_ERROR([No lvm2app.h found])], [[#include <libdevmapper.h>]])
+AC_CHECK_LIB(lvm2app, lvm_lv_snapshot, [], [AC_ERROR([LibLVM (lvm2app) is unusable])])
 
 AC_CHECK_HEADERS([libxl.h libxl_utils.h], [], [AC_ERROR([Standard Xenlight (libxl) headers not found!])])
 AC_CHECK_LIB(xenlight, 
@@ -216,8 +120,22 @@ AC_CHECK_LIB(xenlight,
 	libxl_domain_create_restore,libxl_domain_config_init], 
 	[], [AC_ERROR([Xenlight does not have required features!])])
 
-AC_CHECK_HEADER([libxlutil.h], [], [AC_ERROR([If libxlutil.h didn't get installed with Xen, you need to manually copy it from tools/libxl to /usr/include!])])
+AC_CHECK_HEADER([libxlutil.h], [
+            AC_DEFINE(HAVE_LIBXLUTIL_H, 1, "libxlutil.h was found installed on the system")
+        ],
+        [
+            AC_MSG_NOTICE([libxlutil.h didn't get installed with Xen, using our own copy!])
+        ]
+)
 AC_CHECK_LIB([xlutil], [xlu_cfg_init, xlu_cfg_readfile, xlu_cfg_readdata, xlu_cfg_destroy], [], [AC_ERROR([libxlutil doesn't support required functions!])])
+
+# Check for XL
+AC_PATH_PROG(XL, xl)
+if test "x$XL" != "x"; then
+    AC_DEFINE_UNQUOTED(XL, "$XL", "XL path")
+else
+    AC_ERROR([XL was not found!])
+fi
 
 AC_CHECK_HEADER([xenstore.h])
 AC_CHECK_LIB(xenstore, [xc_read, xs_transaction_start], [], [AC_ERROR([Xenstore not found!])])
@@ -237,8 +155,9 @@ AC_CHECK_LIB(guestfs,
 	[],
 	[AC_MSG_NOTICE([*** No LibGuestFS present])])
 
-AC_CHECK_HEADER([magic.h])
-AC_CHECK_LIB(magic, [magic_open, magic_load, magic_close, magic_file])
+AC_CHECK_HEADER([magic.h], [
+    AC_CHECK_LIB(magic, [magic_open, magic_load, magic_close, magic_file])
+])
 
 # Check for MySQL
 AC_PATH_PROG(MYSQL_CONFIG, mysql_config)
@@ -254,11 +173,35 @@ else
         AC_MSG_NOTICE([*** No working MySQL library found, disabling MySQL logging!])
 fi
 
-# Check for SQlite3
-PKG_CHECK_MODULES([SQLITE3], [sqlite3], 
-	[AC_DEFINE(HAVE_SQLITE3, 1, "Working SQlite3 library found")], 
-	[AC_MSG_NOTICE([*** No working SQlite3 library found, disabling SQlite3 logging!])])
+AC_PATH_PROG(XMLRPC_C_CONFIG, xmlrpc-c-config)
+if test "x$XMLRPC_C_CONFIG" != "x"; then
 
+    PKG_CHECK_MODULES([CURL], [libcurl], [
+    
+        XMLRPC_SERVER_LIBS=$($XMLRPC_C_CONFIG abyss-server --libs)
+        XMLRPC_SERVER_CFLAGS=$($XMLRPC_C_CONFIG abyss-server --cflags)
+        XMLRPC_CLIENT_LIBS=$($XMLRPC_C_CONFIG client --libs)
+        XMLRPC_CLIENT_CFLAGS=$($XMLRPC_C_CONFIG client --cflags)
+    
+        AC_DEFINE(HAVE_XMLRPC, 1, "Working XMLRPC C library found")
+    
+        AC_SUBST(XMLRPC_SERVER_LIBS)
+        AC_SUBST(XMLRPC_SERVER_CFLAGS)
+        AC_SUBST(XMLRPC_CLIENT_LIBS)
+        AC_SUBST(XMLRPC_CLIENT_CFLAGS)
+    
+        #xmlrpc_client="tools/xmlrpc_client"
+        #AC_SUBST(xmlrpc_client)
+        #AC_CONFIG_FILES(tools/xmlrpc_client/Makefile)
+    
+    ], [AC_ERROR(No CURL installed)])
+
+fi
+
+# Check for SQlite3
+#PKG_CHECK_MODULES([SQLITE3], [sqlite3], 
+#	[AC_DEFINE(HAVE_SQLITE3, 1, "Working SQlite3 library found")], 
+#	[AC_MSG_NOTICE([*** No working SQlite3 library found, disabling SQlite3 logging!])])
 
 AC_CONFIG_FILES([Makefile src/Makefile tools/Makefile])
 AC_OUTPUT

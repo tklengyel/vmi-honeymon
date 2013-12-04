@@ -1,8 +1,4 @@
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
+
 #include "structures.h"
 
 void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
@@ -16,9 +12,6 @@ void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
             if (!strcmp(argv[x], "-h") || !strcmp(argv[x], "--help")) {
                 honeymon->interactive = 0;
                 honeymon->action = 1;
-            } else if (!strcmp(argv[x], "-volatility") && x + 1 < argc) {
-                honeymon->volatility = strdup(argv[x + 1]);
-                x += 2;
             } else if (!strcmp(argv[x], "-workdir") && x + 1 < argc) {
                 // Remove tailing "/" from the workdir
                 if ((int) (argv[x + 1][strlen(argv[x + 1]) - 1]) == 47) {
@@ -35,17 +28,6 @@ void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
                 x += 2;
             } else if (!strcmp(argv[x], "-scanpool") && x + 1 < argc) {
                 honeymon->scanpool = atoi(argv[x + 1]);
-                x += 2;
-            } else if (!strcmp(argv[x], "-tcpport") && x + 1 < argc) {
-                honeymon->tcp_port = atoi(argv[x + 1]);
-                x += 2;
-            } else if (!strcmp(argv[x], "-tcpif") && x + 1 < argc) {
-                if (!strcmp(argv[x + 1], "localhost")) {
-                    printf("Specify localhost with 127.0.0.1! Aborting!\n");
-                    break;
-                }
-                free(honeymon->tcp_if);
-                honeymon->tcp_if = strdup(argv[x + 1]);
                 x += 2;
             } else if (!strcmp(argv[x], "-mysqluser") && x + 1 < argc) {
                 honeymon->log->mysql_user = strdup(argv[x + 1]);

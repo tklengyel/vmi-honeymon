@@ -20,7 +20,7 @@
 #include "xen_helper.h"
 #include "input_parser.h"
 #include "honeypots.h"
-#include "tcp_listener.h"
+//TODO: #include "rpc_server.h"
 #include "log.h"
 
 /* This will be used to pass various messages and coordinate threads. Only global variable. */
@@ -41,23 +41,15 @@ void honeymon_init() {
     honeymon->interactive = 1;
     honeymon->vlans = MIN_VLAN;
 
-#ifdef VOLATILITY
-    honeymon->volatility=strdup(VOLATILITY);
-#else
-    honeymon->volatility = NULL;
-#endif
-
     honeymon->honeypots = g_tree_new_full((GCompareDataFunc) strcmp, NULL,
             NULL,
             (GDestroyNotify) honeymon_honeypots_destroy_honeypot_t);
 
     honeymon->log = g_malloc0(sizeof(honeymon_log_interface_t));
 
-    honeymon->tcp_if = g_malloc(snprintf(NULL, 0, "127.0.0.1") + 1);
-    sprintf(honeymon->tcp_if, "127.0.0.1");
-    honeymon->tcp_port = 4567;
-
     honeymon->clone_requests = g_async_queue_new();
+
+    honeymon->lvm = lvm_init(NULL);
 
 #ifdef HAVE_LIBMAGIC
     honeymon->magic_cookie=magic_open(MAGIC_MIME);
@@ -79,20 +71,16 @@ void honeymon_free(honeymon_t* honeymon) {
         g_free(honeymon->honeypotsdir);
         g_free(honeymon->backupdir);
         g_free(honeymon->virusdir);
-        g_free(honeymon->volatility);
         g_free(honeymon->scanconf);
-        g_free(honeymon->tcp_if);
         honeymon_xen_free_interface(honeymon->xen);
-        if (honeymon->tcp_init) shutdown(honeymon->tcp_socket, 0);
         g_async_queue_unref(honeymon->clone_requests);
-
+        lvm_quit(honeymon->lvm);
         g_free(honeymon->log);
         g_free(honeymon);
     }
 }
 
 honeymon_t* honeymon_quit(honeymon_t* honeymon) {
-    if (honeymon->tcp_socket > 0) shutdown(honeymon->tcp_socket, 2);
 
     g_mutex_lock(&honeymon->lock);
     g_tree_destroy(honeymon->honeypots);
@@ -319,14 +307,6 @@ void honeymon_shell(honeymon_t* honeymon) {
                 } else {
                     printf("Current workdir is %s\n", honeymon->workdir);
                 }
-            } else if (!strcmp(command, "volatility")) {
-                if (option != NULL) {
-                    g_free(honeymon->volatility);
-                    honeymon->volatility = strdup(option);
-                } else {
-                    printf("Current Volatility path is %s\n",
-                            honeymon->volatility);
-                }
             } else if (!strcmp(command, "scanconf")) {
                 if (option != NULL) {
                     g_free(honeymon->scanconf);
@@ -386,31 +366,6 @@ void honeymon_shell(honeymon_t* honeymon) {
                 } else {
                     printf("Please specify the Honeypot origin by name!\n");
                 }
-            } else if (!strcmp(command, "tcpport")) {
-                if (option != NULL) {
-                    honeymon->tcp_port = atoi(option);
-                    printf("TCP listen port is set to %i\n",
-                            honeymon->tcp_port);
-                } else {
-                    printf("Current TCP port is set to: %u\n",
-                            honeymon->tcp_port);
-                }
-            } else if (!strcmp(command, "tcpif")) {
-                if (option != NULL) {
-                    g_free(honeymon->tcp_if);
-                    honeymon->tcp_if = strdup(option);
-                    printf("TCP listen address is set to %s\n",
-                            honeymon->tcp_if);
-                } else {
-                    printf("Current TCP listen address is set to: %s\n",
-                            honeymon->tcp_if);
-                }
-            } else if (!strcmp(command, "tcpinit")) {
-                if (!honeymon->tcp_init) {
-                    honeymon_tcp_start_listener(honeymon);
-                } else {
-                    printf("TCP Interface has already been initialized!\n");
-                }
             } else if (!strcmp(command, "quit") || !strcmp(command, "q")
                     || !strcmp(command, "exit")) {
                 honeymon = honeymon_quit(honeymon);
@@ -454,7 +409,8 @@ int main(int argc, char **argv) {
     if (honeymon->interactive) {
 
         if (honeymon->action == 5) {
-            honeymon_tcp_start_listener(honeymon);
+        	//TODO XMLRPC
+            //honeymon_tcp_start_listener(honeymon);
         }
 
         //TODO

@@ -23,6 +23,8 @@
 
 #define MAX_LINE_LENGTH 1024
 
+#ifdef TODO_LIBVMI
+
 bool honeymon_scan_start_all(honeymon_clone_t *clone) {
 
     printf("Starting all available scans on %s\n", clone->clone_name);
@@ -234,3 +236,5 @@ bool honeymon_scan_compare(char *scan, char *origin_scan, char *clone_scan,
 
     return change;
 }
+
+#endif //TODO

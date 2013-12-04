@@ -11,16 +11,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <stdbool.h>
+#include <string.h>
+#include <unistd.h>
+
 #include <libxl.h>
+#ifdef HAVE_LIBXLUTIL_H
 #include <libxlutil.h>
+#else
+#include "_libxlutil.h"
+#endif
 #include <libxl_utils.h>
 #include <xenctrl.h>
 #include <xenguest.h>
 #include <xenstore.h>
+
 #include <glib.h>
-#include <netinet/ether.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
+#include <libdevmapper.h>
+#include <lvm2app.h>
 
 #ifdef HAVE_LIBTHPOOL
 #include <thpool.h>
@@ -69,6 +77,12 @@ typedef struct log_interface {
 
 } honeymon_log_interface_t;
 
+typedef struct lvm {
+	lvm_t handle;
+	vg_t vg;
+	lv_t lv;
+} honeymon_lvm2_interface_t;
+
 typedef struct honeymon {
 
     GMutex lock;
@@ -76,8 +90,7 @@ typedef struct honeymon {
     honeymon_xen_interface_t* xen;
     honeymon_log_interface_t* log;
 
-    // absolute path to Volatility vol.py
-    char* volatility;
+    lvm_t lvm;
 
     bool stealthy;
     bool interactive;
@@ -103,11 +116,6 @@ typedef struct honeymon {
     int number_of_scans;
     int* scanschedule;
 
-    char* tcp_if; // IP to listen on or "any" for all interface
-    uint32_t tcp_port;
-    bool tcp_init;
-    int tcp_socket;
-
     bool guestfs_enable;
 
     bool membench;
@@ -119,13 +127,6 @@ typedef struct honeymon {
 magic_t magic_cookie;
 #endif
 } honeymon_t;
-
-typedef struct tcp_conn {
-    honeymon_t *honeymon;
-    FILE *buffer;
-    int socket;
-    struct sockaddr_in *client;
-} honeymon_tcp_conn_t;
 
 /* These structs are opaque in xlu but we need them
  * to parse the configuration files. */
@@ -151,7 +152,12 @@ typedef struct honeypot {
     char* snapshot_path;
     char* config_path;
     char* ip_path;
-    char *disk_path;
+
+    vg_t vg;
+    char *vg_name;
+
+    lv_t lv;
+    char *lv_name;
 
     XLU_Config2 *config;
 
@@ -177,8 +183,10 @@ typedef struct clone {
     honeymon_honeypot_t* origin;
     char* origin_name;
     char* clone_name;
-    char* qcow2_path;
     char* config_path;
+
+    lv_t clone_lv;
+
     uint16_t vlan;
     uint32_t domID;
 

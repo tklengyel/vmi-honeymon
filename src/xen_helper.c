@@ -14,7 +14,7 @@
 #include <math.h>
 #include <err.h>
 
-//#include <libvmi/libvmi.h>
+#include <libvmi/libvmi.h>
 
 #include "xen_helper.h"
 #include "log.h"
@@ -130,49 +130,99 @@ char *honeymon_xen_first_disk_path(XLU_Config2 *config) {
     return ret;
 }
 
+int get_dom_info(honeymon_xen_interface_t *xen, char *input, uint32_t *domID,
+		char **name) {
+	uint32_t _domID;
+	char *_name = NULL;
+
+	sscanf(input, "%u", &_domID);
+
+	if (_domID == INVALID_DOMID) {
+		libxl_name_to_domid(xen->xl_ctx, input, &_domID);
+		if (_domID == INVALID_DOMID) {
+			printf("Domain is not running, failed to get domID from name!\n");
+			return -1;
+		} else {
+			printf("Got domID from name: %u\n", _domID);
+		}
+	} else {
+		_name = libxl_domid_to_name(xen->xl_ctx, _domID);
+		if (_name == NULL) {
+			printf(
+					"Failed to get domain name from ID, is the domain running?\n");
+			return -1;
+		} else {
+			printf("Got name from domID: %s\n", _name);
+		}
+	}
+
+	*name = _name;
+	*domID = _domID;
+
+	return 1;
+}
+
+int get_config_disks(XLU_Config2 *config, XLU_ConfigList2 **disks) {
+	int number_of_disks;
+	XLU_ConfigList *disks_masked = NULL;
+	if (xlu_cfg_get_list((XLU_Config *) config, "disk", &disks_masked,
+			&number_of_disks, 0)) {
+		printf("The VM config didn't contain a disk configuration line!\n");
+		return -1;
+	}
+
+	if (number_of_disks < 1) {
+		printf("No disks are defined in the config!\n");
+		return -1;
+	}
+
+	*disks = (XLU_ConfigList2 *) disks_masked;
+	return 1;
+}
+
+int get_config_vifs(XLU_Config2 *config, XLU_ConfigList2 **vifs) {
+	// Get the first network interface
+	XLU_ConfigList *vifs_masked = NULL;
+	int number_of_vifs;
+	if (xlu_cfg_get_list((XLU_Config *) config, "vif", &vifs_masked,
+			&number_of_vifs, 0)) {
+		printf("The VM config didn't contain network configuration line!\n");
+		return -1;
+	}
+
+	if (number_of_vifs < 1) {
+		printf("No network interfaces are defined in the config!\n");
+		return -1;
+	}
+
+	*vifs = (XLU_ConfigList2 *) vifs_masked;
+	return 1;
+}
+
 int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
+
+    honeymon_xen_interface_t *xen = honeymon->xen;
+    honeymon_honeypot_t *honeypot = NULL;
+    uint32_t domID = INVALID_DOMID;
+    char* name = NULL;
+
+    char* command = NULL;
+    int ret = -1;
 
     if (honeymon->workdir == NULL) {
         printf("You need to set a workdir for that!\n");
         return -1;
     }
-
-    honeymon_xen_interface_t *xen = honeymon->xen;
-    uint32_t domID = INVALID_DOMID;
-    char* name = NULL;
-    char* config_path;
-    char* origin_path;
-    int sysret;
-    int ret = -1;
-
-    printf("Checking for %s ..\n", dom);
-    sscanf(dom, "%u", &domID);
-
-    if (domID == INVALID_DOMID) {
-        name = g_strdup(dom);
-        libxl_name_to_domid(xen->xl_ctx, name, &domID);
-        if (domID == INVALID_DOMID) {
-            printf("Domain is not running, failed to get domID from name!\n");
-            return ret;
-        } else {
-            printf("Got domID from name: %u\n", domID);
-        }
-    } else {
-        name = libxl_domid_to_name(xen->xl_ctx, domID);
-        if (name == NULL) {
-            printf(
-                    "Failed to get domain name from ID, is the domain running?\n");
-            return ret;
-        } else {
-            printf("Got name from domID: %s\n", name);
-        }
+    if(-1 == get_dom_info(xen, dom, &domID, &name)) {
+    	return ret;
     }
 
     // Get the honeypot structure
-    honeymon_honeypot_t *honeypot = (honeymon_honeypot_t *) g_tree_lookup(
-            honeymon->honeypots, name);
+	honeypot = g_tree_lookup(honeymon->honeypots, name);
 
-    if (!honeypot) return ret;
+    if (!honeypot) {
+    	return ret;
+    }
 
     g_mutex_lock(&honeypot->lock);
     g_mutex_lock(&honeymon->lock);
@@ -181,78 +231,40 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     if (honeymon->vlans < MIN_VLAN) honeymon->vlans += MIN_VLAN;
     g_mutex_unlock(&honeymon->lock);
 
-    int number_of_disks;
-    XLU_ConfigList *disks_masked = NULL;
-    XLU_ConfigList2 *disks = NULL;
-    if (xlu_cfg_get_list((XLU_Config *) honeypot->config, "disk", &disks_masked,
-            &number_of_disks, 0)) {
-        printf("The VM config didn't contain a disk configuration line!\n");
-        return ret;
-    } else disks = (XLU_ConfigList2 *) disks_masked;
+    XLU_ConfigList2 *disks = NULL, *vifs = NULL;
 
-    if (number_of_disks < 1) {
-        printf("No disks are defined in the config!\n");
-        return ret;
+    if(-1 == get_config_disks(honeypot->config, &disks)) {
+    	return ret;
     }
+
+	if (-1 == get_config_vifs(honeypot->config, &vifs)) {
+		return ret;
+	}
 
     char *backup_disk = strdup(disks->values[0]);
-    char *disk_path = honeypot->disk_path;
-    // Get the first network interface
-    XLU_ConfigList *vifs_masked = NULL;
-    XLU_ConfigList2 *vifs = NULL;
-    int number_of_vifs;
-    if (xlu_cfg_get_list((XLU_Config *) honeypot->config, "vif", &vifs_masked,
-            &number_of_vifs, 0)) {
-        printf("The VM config didn't contain network configuration line!\n");
-        return ret;
-    }
-
-    if (number_of_vifs < 1) {
-        printf("No network interfaces are defined in the config!\n");
-        return ret;
-    }
-
-    vifs = (XLU_ConfigList2 *) vifs_masked;
     char *original_vif = strdup(vifs->values[0]);
     char *backup_vif = strdup(vifs->values[0]);
 
     // Setup clone
-    char *disk_clone_path = malloc(
-            snprintf(NULL, 0, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
-                    vlan_id) + 1);
     char *clone_config_path = malloc(
             snprintf(NULL, 0, "%s/%s.%u.config", honeymon->honeypotsdir, name,
                     vlan_id) + 1);
     char *clone_name = malloc(snprintf(NULL, 0, "%s.%u", name, vlan_id) + 1);
     char *vlan = malloc(snprintf(NULL, 0, ".%u", vlan_id) + 1);
-    sprintf(disk_clone_path, "%s/%s.%u.qcow2", honeymon->honeypotsdir, name,
-            vlan_id);
     sprintf(clone_config_path, "%s/%s.%u.config", honeymon->honeypotsdir, name,
             vlan_id);
     sprintf(clone_name, "%s.%u", name, vlan_id);
     sprintf(vlan, ".%u", vlan_id);
 
-    printf("Creating clone %s\n\tDisk %s\n\tConfig %s\n\tVLAN %u\n", clone_name,
-            disk_clone_path, clone_config_path, vlan_id);
+    printf("Creating clone %s\n\tConfig %s\n\tVLAN %u\n", clone_name,
+            clone_config_path, vlan_id);
 
-    char *command = malloc(
-            snprintf(NULL, 0, "%s create -f qcow2 -b %s %s", QEMUIMG, disk_path,
-                    disk_clone_path) + 1);
-    sprintf(command, "%s create -f qcow2 -b %s %s", QEMUIMG, disk_path,
-            disk_clone_path);
-    printf("** RUNNING COMMAND: %s\n", command);
-    sysret = system(command);
-    free(command);
 
-    printf("Qcow2 filesystem clone is created at %s\n", disk_clone_path);
+    //TODO LVM2
+    //const lv_t lv;
+    //lvm_lv_snapshot(lv, NULL, 1);
 
     // Update config
-
-    // Replace disk config
-    free(disks->values[0]);
-    disks->values[0] = malloc(
-            snprintf(NULL, 0, "tap:qcow2:%s,xvda,w", disk_clone_path) + 1);
-    sprintf(disks->values[0], "tap:qcow2:%s,xvda,w", disk_clone_path);
 
     // Replace network bridge
     char delim2[] = ",=";
@@ -316,7 +328,9 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
                     honeypot->snapshot_path) + 1);
     sprintf(command, "%s restore -p %s %s", XL, clone_config_path, honeypot->snapshot_path);
     printf("** RUNNING COMMAND: %s\n", command);
-    sysret = system(command);
+    if(-1 == system(command)) {
+    	printf("** Command FAILED\n");
+    }
     free(command);
 
     uint32_t cloneID = 0;
@@ -327,9 +341,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
         printf("Clone creation failed!\n");
         goto done;
     }
-
-    //clone->domID=cloneID;
-    int memshared = 0;
 
     int page = xc_domain_maximum_gpfn(xen->xc, domID) + 1;
 
@@ -362,7 +373,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     }
 
     printf("Shared %i pages!\n", shared);
-    memshared = 1;
 
     honeymon_clone_t *clone = honeymon_honeypots_init_clone(honeymon, name,
             clone_name, vlan_id);
@@ -374,7 +384,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     done:
     g_mutex_unlock(&honeypot->lock);
     free(clone_name);
-    free(disk_clone_path);
     free(clone_config_path);
     free(vlan);
     free(name);
@@ -442,11 +451,6 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
         return 1;
     }
 
-    if (honeymon->volatility == NULL) {
-        printf("You can't do this without Volatility path specified!\n");
-        return 1;
-    }
-
     honeymon_xen_interface_t *xen = honeymon->xen;
     uint32_t domID = INVALID_DOMID;
     sscanf(dom, "%u", &domID);
@@ -509,33 +513,24 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
             snprintf(NULL, 0, "%s save %u %s", XL, domID, output) + 1);
     sprintf(command, "%s save %u %s", XL, domID, output);
     printf("** RUNNING COMMAND: %s\n", command);
-    int sysret = system(command);
+    if(-1 == system(command)) {
+    	printf("** Command FAILED\n");
+    }
     free(command);
 
     command = malloc(snprintf(NULL, 0, "%s restore -p %s", XL, output) + 1);
     sprintf(command, "%s restore -p %s", XL, output);
     printf("** RUNNING COMMAND: %s\n", command);
-    sysret = system(command);
-    free(command);
-
-    char profile[128];
-    printf("Please enter the Volatility profile of this VM: ");
-    fflush(stdout);
-    char *p = fgets(profile, sizeof(profile), stdin);
-    char *nl = strrchr(p, '\r');
-    if (nl) *nl = '\0';
-    nl = strrchr(p, '\n');
-    if (nl) *nl = '\0';
-
-    FILE *output_prof = fopen(output_profile, "w");
-    fprintf(output_prof, "%s", profile);
-    fclose(output_prof);
+	if (-1 == system(command)) {
+		printf("** Command FAILED\n");
+	}
+	free(command);
 
     char ip[INET_ADDRSTRLEN];
     printf("Please enter the IP of this VM: ");
     fflush(stdout);
-    p = fgets(ip, INET_ADDRSTRLEN, stdin);
-    nl = strrchr(p, '\r');
+    char *p = fgets(ip, INET_ADDRSTRLEN, stdin);
+    char *nl = strrchr(p, '\r');
     if (nl) *nl = '\0';
     nl = strrchr(p, '\n');
     if (nl) *nl = '\0';
@@ -548,54 +543,6 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
 
     honeymon_honeypot_t* honeypot = honeymon_honeypots_init_honeypot(honeymon,
             name);
-
-    if (honeypot->scans != NULL) g_slist_free_full(honeypot->scans,
-            (GDestroyNotify) free);
-
-    GSList *scans = honeymon->scans;
-    while (scans != NULL) {
-        char *scan = strdup((char *) scans->data);
-        char *output = malloc(
-                snprintf(NULL, 0, "%s/%s.%s", honeymon->originsdir, name, scan)
-                        + 1);
-        sprintf(output, "%s/%s.%s", honeymon->originsdir, name, scan);
-        int out = open(output, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        char *vmi = malloc(snprintf(NULL, 0, "vmi://%s", name) + 1);
-        sprintf(vmi, "vmi://%s", name);
-        char *profile = malloc(
-                snprintf(NULL, 0, "--profile=%s", honeypot->profile) + 1);
-        sprintf(profile, "--profile=%s", honeypot->profile);
-
-        printf("Running scan: %s\n", scan);
-
-        struct timeval scan_time_start, scan_time_end;
-        gettimeofday(&scan_time_start, NULL);
-
-        pid_t pID = fork();
-        if (pID == 0) {
-            dup2(out, STDOUT_FILENO);
-            dup2(out, STDERR_FILENO);
-            prctl(PR_SET_PDEATHSIG, SIGHUP); // pass sighup to die if parent dies
-            execl(PYTHON, PYTHON, honeymon->volatility, "-l", vmi, profile,
-                    scan, NULL);
-            exit(0);
-        } else if (pID < 0) {
-            errx(1, "Failed to fork!\n");
-        }
-        waitpid(pID, NULL, 0);
-
-        gettimeofday(&scan_time_end, NULL);
-        printf("Scan rune time: %lis\n",
-                scan_time_end.tv_sec - scan_time_start.tv_sec);
-
-        close(out);
-        free(output);
-        free(vmi);
-        free(profile);
-
-        honeypot->scans = g_slist_append(honeypot->scans, scan);
-        scans = scans->next;
-    }
 
 #ifdef HAVE_LIBGUESTFS
     XLU_Config2 *xlu_config = (XLU_Config2 *)honeymon_xen_parse_domconfig_raw(config);
@@ -621,6 +568,8 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
 
 #endif
 
+    g_tree_insert(honeymon->honeypots, honeypot->origin_name, honeypot);
+
     printf("Done!\n");
 
     free(output);
@@ -639,7 +588,6 @@ int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom) {
 
     honeymon_xen_interface_t *xen = honeymon->xen;
     unsigned int domID = INVALID_DOMID;
-    int sysret;
     char* name = NULL;
     sscanf(dom, "%u", &domID);
 
@@ -686,8 +634,10 @@ int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom) {
                     + 1);
     sprintf(command, "%s restore -p %s %s", XL, config_path, path);
     printf("** RUNNING COMMAND: %s\n", command);
-    sysret = system(command);
-    free(command);
+	if (-1 == system(command)) {
+		printf("** Command FAILED\n");
+	}
+	free(command);
 
     libxl_name_to_domid(xen->xl_ctx, name, &domID);
 
@@ -712,7 +662,6 @@ void honeymon_xen_restore(honeymon_t *honeymon, char *option) {
         return;
     }
 
-    honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon, option);
     if (honeymon_honeypots_find_clone(honeymon, option)) printf(
             "We already have a clone defined with this name: %s\n", option);
     else honeymon_xen_restore_origin(honeymon, option);
@@ -749,18 +698,20 @@ void honeymon_xen_save_domconfig(honeymon_t* honeymon,
  * DomU Configuration management stuff
  */
 honeymon_xen_domconfig_raw_t* honeymon_xen_domconfig_raw_by_id(
-        honeymon_xen_interface_t *xen, unsigned int domID) {
-    honeymon_xen_domconfig_raw_t *config = malloc(
-            sizeof(honeymon_xen_domconfig_raw_t));
-    config->config_data = NULL;
+		honeymon_xen_interface_t *xen, unsigned int domID) {
 
-    int rc = libxl_userdata_retrieve(xen->xl_ctx, domID, "xl",
-            &(config->config_data), &(config->config_length));
+	honeymon_xen_domconfig_raw_t *config = malloc(
+			sizeof(honeymon_xen_domconfig_raw_t));
+	config->config_data = NULL;
 
-    //if(rc) printf("Unable to get config file\n");
-    //else printf("Config length: %i\tData: %s\n", *config_length, config_data);
+	if(libxl_userdata_retrieve(xen->xl_ctx, domID, "xl",
 
-    return config;
+			&(config->config_data), &(config->config_length))) {
+		 printf("Unable to get config file\n");
+		 return NULL;
+	}
+
+	return config;
 }
 
 void honeymon_xen_free_domconfig_raw(honeymon_xen_domconfig_raw_t* raw_config) {
@@ -774,12 +725,6 @@ XLU_Config* honeymon_xen_parse_domconfig_raw(
     XLU_Config *config = xlu_cfg_init(stderr, "cmdline");
     xlu_cfg_readdata(config, (char *) (raw_config->config_data),
             raw_config->config_length);
-
-    /*const char *build=NULL;
-
-     xlu_cfg_get_string(config, "builder", &build, 0);
-
-     printf("Yay, got builder string out of config: %s\n", build);*/
 
     return config;
 }

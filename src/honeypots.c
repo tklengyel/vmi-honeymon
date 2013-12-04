@@ -1,9 +1,4 @@
-#include <config.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <unistd.h>
+
 #include <sys/types.h>
 #include <sys/prctl.h>
 #include <sys/stat.h>
@@ -34,8 +29,6 @@ void honeymon_honeypots_build_list(honeymon_t *honeymon) {
     struct dirent *ep = NULL;
 
     char delim[] = ".";
-    char delim2[] = "_";
-    char delim3[] = " ";
     dp = opendir(honeymon->originsdir);
     if (dp != NULL) {
         while ((ep = readdir(dp)) != NULL) {
@@ -51,6 +44,8 @@ void honeymon_honeypots_build_list(honeymon_t *honeymon) {
                 if (fschecksum != NULL
                         && !strcmp(fschecksum, GUESTFS_HASH_TYPE)) {
 #ifdef HAVE_LIBGUESTFS
+                    char delim2[] = "_";
+                    char delim3[] = " ";
                     char *dev=strtok(extension, delim2);
                     int devID=atoi(strtok(NULL, delim2));
 
@@ -124,7 +119,7 @@ void honeymon_honeypots_build_clone_list(honeymon_t *honeymon) {
 
             if (!strcmp(ep->d_name, ".") || !strcmp(ep->d_name, "..")) continue;
 
-            uint16_t vlan = 0, domID = 0;
+            uint16_t vlan = 0;
             char *split = strdup(ep->d_name);
             char *common_name = NULL, *id_s = NULL, *extension = NULL;
             common_name = strtok(split, delim);
@@ -179,8 +174,8 @@ int honeymon_honeypots_list_loop2(gpointer key, gpointer value, gpointer data) {
     honeymon_clone_t *clone = (honeymon_clone_t *) value;
 
     printf("  Clone VM: %s. DomID: %u.\n", name, clone->domID);
-    printf("\tConfig path: %s\n\tQCoW2 path: %s\n\tVLAN: %u\n",
-            clone->config_path, clone->qcow2_path, clone->vlan);
+    printf("\tConfig path: %s\n\tVLAN: %u\n",
+            clone->config_path, clone->vlan);
 
     return 0;
 }
@@ -197,7 +192,8 @@ int honeymon_honeypots_list_loop(gpointer key, gpointer value, gpointer data) {
     printf("\tSnapshot path: %s\n",origin->snapshot_path);
     printf("\tProfile: %s\n",origin->profile);
     printf("\tMAC: %s\n", origin->mac);
-    printf("\tDisk: %s\n", origin->disk_path);
+    printf("\tLVM VG: %s\n", origin->vg_name);
+    printf("\tLVM LV: %s\n", origin->lv_name);
 
     g_tree_foreach(origin->clone_list,
             (GTraverseFunc) honeymon_honeypots_list_loop2, NULL);
@@ -276,15 +272,14 @@ void* honeymon_honeypot_runner(void *input) {
             sleep_cycle += clone->tscan[clone->cscan] * G_TIME_SPAN_SECOND;
             clone->cscan++;
 
-            if (honeymon->membench) {
-                clone->membench = 1;
-                pthread_attr_t tattr;
-                int ret = pthread_attr_init(&tattr);
-                ret = pthread_attr_setdetachstate(&tattr,
-                        PTHREAD_CREATE_DETACHED);
-                pthread_create(&(clone->membench_thread), &tattr,
-                        honeymon_honeypot_membench, (void *) clone);
-                pthread_attr_destroy(&tattr);
+			if (honeymon->membench) {
+				clone->membench = 1;
+				pthread_attr_t tattr;
+				pthread_attr_init(&tattr);
+				pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+				pthread_create(&(clone->membench_thread), &tattr,
+						honeymon_honeypot_membench, (void *) clone);
+				pthread_attr_destroy(&tattr);
             }
 
             rc = g_cond_wait_until(&(clone->cond), &(clone->lock), sleep_cycle);
@@ -305,7 +300,9 @@ void* honeymon_honeypot_runner(void *input) {
             g_mutex_lock(&(clone->scan_lock));
             clone->scan_initiator = 0;
 
-            if (!honeymon->stealthy) libxl_domain_pause(honeymon->xen->xl_ctx,
+            /* TODO LibVMI
+             *
+             * if (!honeymon->stealthy) libxl_domain_pause(honeymon->xen->xl_ctx,
                     clone->domID);
 
             int change = honeymon_scan_start_all(clone);
@@ -314,7 +311,7 @@ void* honeymon_honeypot_runner(void *input) {
                 clone->membench = 0;
                 clone->cscan = 0;
             } else if (!honeymon->stealthy) libxl_domain_unpause(
-                    honeymon->xen->xl_ctx, clone->domID);
+                    honeymon->xen->xl_ctx, clone->domID);*/
 
             g_mutex_unlock(&(clone->scan_lock));
 
@@ -343,7 +340,7 @@ void* honeymon_honeypot_runner(void *input) {
 
     final_scan: libxl_domain_pause(honeymon->xen->xl_ctx, clone->domID);
     g_mutex_lock(&(clone->scan_lock));
-    honeymon_scan_start_all(clone);
+    //honeymon_scan_start_all(clone);
 
     printf("Destroying clone %s\n", clone->clone_name);
     libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
@@ -426,7 +423,16 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         }
 
         origin->mac = honeymon_xen_first_vif_mac(origin->config);
-        origin->disk_path = honeymon_xen_first_disk_path(origin->config);
+        char *disk_config = honeymon_xen_first_disk_path(origin->config);
+        char **disk_config_details = g_strsplit(disk_config, "/", 4);
+        origin->vg_name = g_strdup(disk_config_details[2]);
+        origin->lv_name = g_strdup(disk_config_details[3]);
+        g_strfreev(disk_config_details);
+
+        origin->vg = lvm_vg_open(honeymon->lvm, origin->vg_name, "w", 0);
+        origin->lv = lvm_lv_from_name(origin->vg, origin->lv_name);
+
+        printf("VG: %s LV: %s\n", origin->vg_name, origin->lv_name);
 
         printf("Checking for %s: ", origin->snapshot_path);
 
@@ -512,16 +518,13 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
         char* config_path = malloc(
                 snprintf(NULL, 0, "%s/%s.config", honeymon->honeypotsdir,
                         clone_name) + 1);
-        char* qcow2_path = malloc(
-                snprintf(NULL, 0, "%s/%s.qcow2", honeymon->honeypotsdir,
-                        clone_name) + 1);
         sprintf(config_path, "%s/%s.config", honeymon->honeypotsdir,
                 clone_name);
-        sprintf(qcow2_path, "%s/%s.qcow2", honeymon->honeypotsdir, clone_name);
         unlink(config_path);
-        unlink(qcow2_path);
         free(config_path);
-        free(qcow2_path);
+
+        lv_t clone_lv = lvm_lv_from_name(origin->vg, clone_name);
+        lvm_vg_remove_lv(clone_lv);
 
         return NULL;
     }
@@ -558,14 +561,11 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
         clone->origin_name = strdup(origin_name);
         clone->clone_name = strdup(clone_name);
 
-        clone->qcow2_path = malloc(
-                snprintf(NULL, 0, "%s/%s.qcow2", honeymon->honeypotsdir,
-                        clone_name) + 1);
+        clone->clone_lv = lvm_lv_from_name(origin->vg, clone->clone_name);
+
         clone->config_path = malloc(
                 snprintf(NULL, 0, "%s/%s.config", honeymon->honeypotsdir,
                         clone_name) + 1);
-        sprintf(clone->qcow2_path, "%s/%s.qcow2", honeymon->honeypotsdir,
-                clone_name);
         sprintf(clone->config_path, "%s/%s.config", honeymon->honeypotsdir,
                 clone_name);
 
@@ -803,7 +803,6 @@ void honeymon_free_clone(honeymon_clone_t *clone) {
 
         g_free(clone->clone_name);
         g_free(clone->origin_name);
-        g_free(clone->qcow2_path);
         g_free(clone->config_path);
         g_free(clone->scan_threads);
         g_free(clone->tscan);
@@ -832,7 +831,9 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     g_free(honeypot->profile);
     g_free(honeypot->ip_path);
     g_free(honeypot->mac);
-    g_free(honeypot->disk_path);
+    g_free(honeypot->vg_name);
+    g_free(honeypot->lv_name);
+    lvm_vg_close(honeypot->vg);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_free(honeypot->origin_name);
     g_mutex_clear(&honeypot->lock);
