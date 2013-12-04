@@ -18,16 +18,9 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VMI_HONEYMON_H
-#define VMI_HONEYMON_H
+#ifndef RPC_SERVER_H_
+#define RPC_SERVER_H_
 
-#include "structures.h"
+void* rpc_server_thread(void *input);
 
-/* This will be used to pass various messages and coordinate threads. Only global variable. */
-honeymon_t* honeymon;
-
-void honeymon_start_scan_scheduler(honeymon_t *h);
-void honeymon_interrupt(int signal);
-void honeymon_shell();
-
-#endif
+#endif /* RPC_SERVER_H_ */

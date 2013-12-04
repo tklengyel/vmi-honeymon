@@ -1,3 +1,23 @@
+/*
+ * This file is part of the VMI-Honeymon project.
+ *
+ * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
+ *
+ * VMI-Honeymon is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef STRUCTURES_H
 #define STRUCTURES_H
 
@@ -9,6 +29,8 @@
 #define CLONE_BUFFER 5
 #define MIN_VLAN 10
 #define VIF_APPEND "script=vif-openvswitch,backend=openvswitch"
+#define RPC_SERVER_PORT 4567
+#define RPC_SERVER_LOG NULL
 
 /******************************************/
 
@@ -38,9 +60,7 @@
 #include <libdevmapper.h>
 #include <lvm2app.h>
 
-#ifdef HAVE_LIBTHPOOL
-#include <thpool.h>
-#endif
+#include <libvmi/libvmi.h>
 
 #ifdef HAVE_MYSQL
 #include <mysql.h>
@@ -52,6 +72,12 @@
 
 #ifdef HAVE_LIBMAGIC
 #include <magic.h>
+#endif
+
+#ifdef HAVE_XMLRPC
+#include <xmlrpc-c/base.h>
+#include <xmlrpc-c/server.h>
+#include <xmlrpc-c/server_abyss.h>
 #endif
 
 typedef struct xen_interface {
@@ -128,11 +154,19 @@ typedef struct honeymon {
 
     bool membench;
 
-    int scanpool;
-    GThreadPool *thpool;
+    //int scanpool;
+    //GThreadPool *thpool;
 
 #ifdef HAVE_LIBMAGIC
 magic_t magic_cookie;
+#endif
+
+#ifdef HAVE_XMLRPC
+    GMutex rpc_lock;
+    GCond rpc_cond;
+    pthread_t rpc_server_thread;
+
+    xmlrpc_server_abyss_t *rpc_server;
 #endif
 } honeymon_t;
 
@@ -173,15 +207,11 @@ typedef struct honeypot {
     char ip[INET_ADDRSTRLEN];
     char *mac;
 
-    char* profile_path;
-    char* profile;
-
     unsigned int domID; // 0 if not actually running but restorable
     unsigned int clones; // number of active clones
     unsigned int max_clones; // max number of active clones
     unsigned int clone_buffer; // number of inactive clones to keep around at any time
     GTree* clone_list; // clone list of honeymon_clone_t
-    GSList* scans; // enabled volatility scans
 
     GSList* fschecksum; // each node is a GTree with the file path as key and hash as value
 } honeymon_honeypot_t;
@@ -192,6 +222,8 @@ typedef struct clone {
     char* origin_name;
     char* clone_name;
     char* config_path;
+
+    vmi_instance_t vmi;
 
     lv_t clone_lv;
 
@@ -228,13 +260,5 @@ typedef struct clone {
 guestfs_h* guestfs;
 #endif
 } honeymon_clone_t;
-
-typedef struct scan_input {
-    char* domain;
-    char* scan;
-    honeymon_t* honeymon;
-    honeymon_clone_t* clone;
-    bool* result;
-} honeymon_scan_input_t;
 
 #endif

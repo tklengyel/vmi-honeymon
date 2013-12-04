@@ -40,11 +40,8 @@
 #include "xen_helper.h"
 #include "input_parser.h"
 #include "honeypots.h"
-//TODO: #include "rpc_server.h"
+#include "rpc_server.h"
 #include "log.h"
-
-/* This will be used to pass various messages and coordinate threads. Only global variable. */
-honeymon_t* honeymon;
 
 //TODO
 void honeymon_interrupt(int signal) {
@@ -57,6 +54,14 @@ void honeymon_init() {
     honeymon = (honeymon_t*) g_malloc0(sizeof(honeymon_t));
 
     g_mutex_init(&honeymon->lock);
+
+#ifdef HAVE_XMLRPC
+    g_mutex_init(&honeymon->rpc_lock);
+    g_cond_init(&honeymon->rpc_cond);
+
+    pthread_create(&(honeymon->rpc_server_thread), NULL, rpc_server_thread,
+			(void *) honeymon);
+#endif
 
     honeymon->interactive = 1;
     honeymon->vlans = MIN_VLAN;
@@ -106,6 +111,14 @@ honeymon_t* honeymon_quit(honeymon_t* honeymon) {
     g_tree_destroy(honeymon->honeypots);
     g_async_queue_push(honeymon->clone_requests,"exit thread");
     pthread_join(honeymon->clone_factory,NULL);
+
+#ifdef HAVE_XMLRPC
+	xmlrpc_env env;
+	xmlrpc_env_init(&env);
+	xmlrpc_server_abyss_terminate(&env, honeymon->rpc_server);
+	xmlrpc_env_clean(&env);
+	pthread_join(honeymon->rpc_server_thread, NULL);
+#endif
 
     honeymon_free(honeymon);
     return NULL;

@@ -33,10 +33,6 @@
 #include <glib.h>
 #include <err.h>
 
-#ifdef HAVE_LIBTHPOOL
-#include <thpool.h>
-#endif
-
 #include "structures.h"
 #include "log.h"
 #include "scan.h"

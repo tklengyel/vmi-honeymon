@@ -100,16 +100,6 @@ void honeymon_honeypots_build_list(honeymon_t *honeymon) {
                     //printf("\tLibGuestFS is present, skipping hash load.\n");
 #endif
                     //printf("\tFound fs checksum for dev ID %i\n", devID);
-                } else if (strcmp(extension, "origin")
-                        && strcmp(extension, "config")) {
-                    GSList *test = g_slist_find_custom(honeymon->scans,
-                            extension, (GCompareFunc) strcmp);
-                    if (test != NULL) {
-                        char *scan = strdup(extension);
-                        honeypot->scans = g_slist_append(honeypot->scans, scan);
-                    } // else {
-                      //	printf("\tCouldn't find scan in scanconf: %s\n", extension);
-                      //}
                 }
             }
 
@@ -209,7 +199,6 @@ int honeymon_honeypots_list_loop(gpointer key, gpointer value, gpointer data) {
 
     printf("\tConfig path: %s\n", origin->config_path);
     printf("\tSnapshot path: %s\n",origin->snapshot_path);
-    printf("\tProfile: %s\n",origin->profile);
     printf("\tMAC: %s\n", origin->mac);
     printf("\tLVM VG: %s\n", origin->vg_name);
     printf("\tLVM LV: %s\n", origin->lv_name);
@@ -464,7 +453,6 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->clone_list = g_tree_new_full((GCompareDataFunc) strcmp, NULL,
                 NULL, (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
 
-        origin->scans = NULL;
         origin->fschecksum = NULL;
 
         FILE *file = fopen(origin->ip_path, "r");
@@ -770,7 +758,7 @@ gboolean honeymon_honeypots_get_random2(gpointer key,
     return FALSE;
 }
 
-honeymon_clone_t *honeymon_honeypots_get_random(honeymon_t *honeymon) {
+honeymon_clone_t *honeymon_honeypots_get_random_free(honeymon_t *honeymon) {
     GSList *free_clones = NULL;
     g_tree_foreach(honeymon->honeypots,
             (GTraverseFunc) honeymon_honeypots_get_random2, &free_clones);
@@ -786,6 +774,30 @@ honeymon_clone_t *honeymon_honeypots_get_random(honeymon_t *honeymon) {
         g_slist_free(free_clones);
         return clone;
     } else return NULL;
+}
+
+gboolean honeymon_honeypots_get_free2(gpointer key, honeymon_clone_t *clone,
+		honeymon_clone_t **out) {
+
+	if (clone->paused) {
+		*out = clone;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+honeymon_clone_t *honeymon_honeypots_get_free(honeymon_t *honeymon,
+		const char *honeypot) {
+
+	honeymon_clone_t *ret = NULL;
+	honeymon_honeypot_t *origin = g_tree_lookup(honeymon->honeypots, honeypot);
+
+	if (origin) {
+		g_tree_foreach(origin->clone_list,
+				(GTraverseFunc) honeymon_honeypots_get_free2, &ret);
+	}
+
+	return ret;
 }
 
 /* Structure destroyers */
@@ -824,7 +836,6 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     if (honeypot->clone_list != NULL) g_tree_destroy(honeypot->clone_list);
     g_free(honeypot->snapshot_path);
     g_free(honeypot->config_path);
-    g_free(honeypot->profile);
     g_free(honeypot->ip_path);
     g_free(honeypot->mac);
     g_free(honeypot->vg_name);

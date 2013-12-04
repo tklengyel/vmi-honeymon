@@ -26,6 +26,7 @@ vmi_honeymon_SOURCES += scan.c scan.h
 vmi_honeymon_SOURCES += guestfs_helper.c guestfs_helper.h
 vmi_honeymon_SOURCES += log.c log.h
 vmi_honeymon_SOURCES += log_mysql.c log_mysql.h
+vmi_honeymon_SOURCES += rpc_server.c rpc_server.h
 
 AM_CFLAGS = $(CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)

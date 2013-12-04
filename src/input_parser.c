@@ -45,9 +45,6 @@ void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
             } else if (!strcmp(argv[x], "-scanschedule") && x + 1 < argc) {
                 honeymon->scanscheduleconf = strdup(argv[x + 1]);
                 x += 2;
-            } else if (!strcmp(argv[x], "-scanpool") && x + 1 < argc) {
-                honeymon->scanpool = atoi(argv[x + 1]);
-                x += 2;
             } else if (!strcmp(argv[x], "-mysqluser") && x + 1 < argc) {
                 honeymon->log->mysql_user = strdup(argv[x + 1]);
                 x += 2;
