@@ -80,9 +80,19 @@ rpc_stop_clone(xmlrpc_env * const envP,
 	return xmlrpc_build_value(envP, "i", 1);
 }
 
+static xmlrpc_value *
+rpc_echo_test(xmlrpc_env * const envP,
+        __attribute__((unused))   xmlrpc_value * const paramArrayP,
+        __attribute__((unused))void * const serverInfo,
+        __attribute__((unused))void * const channelInfo) {
+
+    return xmlrpc_build_value(envP, "s", PACKAGE_STRING);
+}
+
 /******************************************************************************/
 
 enum rpc_function {
+    RPC_ECHO_TEST,
 	RPC_GET_CLONE,
 	RPC_GET_RANDOM_CLONE,
 	RPC_STOP_CLONE,
@@ -92,6 +102,9 @@ enum rpc_function {
 
 struct xmlrpc_method_info3
 const method[__MAX_RPC_FUNCTIONS] = {
+	[RPC_ECHO_TEST] =
+		{ 	.methodName = "echo_test",
+			.methodFunction = &rpc_echo_test },
 	[RPC_GET_CLONE] =
 		{ 	.methodName = "get_clone",
 			.methodFunction = &rpc_get_clone },
@@ -133,6 +146,8 @@ void* rpc_server_thread(void *input) {
 	xmlrpc_server_abyss_create(&env, &serverparm, XMLRPC_APSIZE(port_number),
 			&honeymon->rpc_server);
 	dieIfFailed("xmlrpc_server_abyss_create", env);
+
+    printf("\tXML-RPC Server has been created\n");
 
 	xmlrpc_server_abyss_run_server(&env, honeymon->rpc_server);
 	dieIfFailed("xmlrpc_server_abyss_run_server", env);

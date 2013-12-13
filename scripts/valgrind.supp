@@ -1,0 +1,21 @@
+{
+   <xl1>
+   Memcheck:Cond
+   fun:libxl_list_domain
+}
+{
+   <xl2>
+   Memcheck:Cond
+   fun:libxl_name_to_domid
+}
+{
+   <xl3>
+   Memcheck:Cond
+   fun:libxl_domain_info
+}
+{
+   <xl4>
+   Memcheck:Cond
+   fun:libxl_list_vm
+}
+
