@@ -20,8 +20,14 @@
 
 #include "vmi-honeymon.h"
 #include "honeypots.h"
+#include "structures.h"
+#include "config.h"
 
 #ifdef HAVE_XMLRPC
+
+#include <xmlrpc-c/base.h>
+#include <xmlrpc-c/server.h>
+#include <xmlrpc-c/server_abyss.h>
 
 static void dieIfFailed(const char * const description, xmlrpc_env const env) {
 
@@ -45,12 +51,12 @@ rpc_get_clone(xmlrpc_env * const envP,
 	if (clone) {
 		g_async_queue_push(honeymon->clone_requests, strdup(s));
 		g_cond_signal(&clone->cond);
-		return xmlrpc_build_value(envP, "s", clone->clone_name);
+		return xmlrpc_build_value(envP, "({s:d})", clone->clone_name, clone->vlan);
 	}
 
 	g_free(s);
 
-	return xmlrpc_build_value(envP, "s", "-");
+	return xmlrpc_build_value(envP, "({s:d})", "-", 0);
 }
 
 static xmlrpc_value *
@@ -64,10 +70,10 @@ rpc_get_random_clone(xmlrpc_env * const envP,
 	if (clone) {
 		g_async_queue_push(honeymon->clone_requests, strdup(clone->clone_name));
 		g_cond_signal(&clone->cond);
-		return xmlrpc_build_value(envP, "s", clone->clone_name);
+		return xmlrpc_build_value(envP, "({s:d})", clone->clone_name, clone->vlan);
 	}
 
-	return xmlrpc_build_value(envP, "s", "-");
+	return xmlrpc_build_value(envP, "({s:d})", "-", 0);
 }
 
 static xmlrpc_value *
@@ -76,7 +82,7 @@ rpc_stop_clone(xmlrpc_env * const envP,
 		__attribute__((unused))void * const serverInfo,
 		__attribute__((unused))void * const channelInfo) {
 
-
+	//TODO
 	return xmlrpc_build_value(envP, "i", 1);
 }
 
