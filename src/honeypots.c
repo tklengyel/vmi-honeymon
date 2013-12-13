@@ -428,9 +428,14 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->mac = honeymon_xen_first_vif_mac(origin->config);
         char *disk_config = honeymon_xen_first_disk_path(origin->config);
         char **disk_config_details = g_strsplit(disk_config, "/", 4);
-        origin->vg_name = g_strdup(disk_config_details[2]);
-        origin->lv_name = g_strdup(disk_config_details[3]);
-        g_strfreev(disk_config_details);
+        if(disk_config_details && disk_config_details[2] && disk_config_details[3]) {
+            origin->vg_name = g_strdup(disk_config_details[2]);
+            origin->lv_name = g_strdup(disk_config_details[3]);
+            g_strfreev(disk_config_details);
+        } else {
+            printf("Missing disk config info!\n");
+            return NULL;
+        }
         free(disk_config);
 
         origin->vg = lvm_vg_open(honeymon->lvm, origin->vg_name, "w", 0);

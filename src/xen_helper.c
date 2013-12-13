@@ -152,20 +152,23 @@ char *honeymon_xen_first_disk_path(XLU_Config2 *config) {
 
 int get_dom_info(honeymon_xen_interface_t *xen, char *input, uint32_t *domID,
 		char **name) {
+
 	uint32_t _domID;
 	char *_name = NULL;
 
 	sscanf(input, "%u", &_domID);
 
-	if (_domID == INVALID_DOMID) {
+	if (!_domID) {
+        _name = input;
 		libxl_name_to_domid(xen->xl_ctx, input, &_domID);
-		if (_domID == INVALID_DOMID) {
+		if (!_domID || _domID == INVALID_DOMID) {
 			printf("Domain is not running, failed to get domID from name!\n");
 			return -1;
 		} else {
 			printf("Got domID from name: %u\n", _domID);
 		}
 	} else {
+        printf("Converting domid %u to name\n", _domID);
 		_name = libxl_domid_to_name(xen->xl_ctx, _domID);
 		if (_name == NULL) {
 			printf(
@@ -237,6 +240,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     }
 
     // Get the honeypot structure
+    g_mutex_lock(&honeymon->lock);
 	honeypot = g_tree_lookup(honeymon->honeypots, name);
 
     if (!honeypot) {
@@ -244,10 +248,11 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
     }
 
     g_mutex_lock(&honeypot->lock);
-    g_mutex_lock(&honeymon->lock);
+
     uint16_t vlan_id = honeymon->vlans;
     honeymon->vlans++;
     if (honeymon->vlans < MIN_VLAN) honeymon->vlans += MIN_VLAN;
+    g_mutex_unlock(&honeymon->lock);
 
     XLU_ConfigList2 *disks = NULL, *vifs = NULL;
 
@@ -348,9 +353,7 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
                     honeypot->snapshot_path) + 1);
     sprintf(command, "%s restore -p %s %s", XL, clone_config_path, honeypot->snapshot_path);
     printf("** RUNNING COMMAND: %s\n", command);
-    if(-1 == system(command)) {
-    	printf("** Command FAILED\n");
-    }
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 
     uint32_t cloneID = 0;
@@ -406,7 +409,6 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
 
     done:
     g_mutex_unlock(&honeypot->lock);
-    g_mutex_unlock(&honeymon->lock);
 
     g_free(clone_name);
     g_free(clone_config_path);
@@ -538,17 +540,13 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
             snprintf(NULL, 0, "%s save %u %s", XL, domID, output) + 1);
     sprintf(command, "%s save %u %s", XL, domID, output);
     printf("** RUNNING COMMAND: %s\n", command);
-    if(-1 == system(command)) {
-    	printf("** Command FAILED\n");
-    }
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 
     command = malloc(snprintf(NULL, 0, "%s restore -p %s", XL, output) + 1);
     sprintf(command, "%s restore -p %s", XL, output);
     printf("** RUNNING COMMAND: %s\n", command);
-	if (-1 == system(command)) {
-		printf("** Command FAILED\n");
-	}
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
 	free(command);
 
     char ip[INET_ADDRSTRLEN];
@@ -658,9 +656,7 @@ int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom) {
                     + 1);
     sprintf(command, "%s restore -p %s %s", XL, config_path, path);
     printf("** RUNNING COMMAND: %s\n", command);
-	if (-1 == system(command)) {
-		printf("** Command FAILED\n");
-	}
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
 	free(command);
 
     libxl_name_to_domid(xen->xl_ctx, name, &domID);

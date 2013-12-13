@@ -108,11 +108,15 @@ void honeymon_free(honeymon_t* honeymon) {
 honeymon_t* honeymon_quit(honeymon_t* honeymon) {
 
     g_mutex_lock(&honeymon->lock);
+
+    printf("Clearing honeypots\n");
     g_tree_destroy(honeymon->honeypots);
+    printf("Clearing clone factory\n");
     g_async_queue_push(honeymon->clone_requests,"exit thread");
     pthread_join(honeymon->clone_factory,NULL);
 
 #ifdef HAVE_XMLRPC
+    printf("Clearing XMLRPC server\n");
 	xmlrpc_env env;
 	xmlrpc_env_init(&env);
 	xmlrpc_server_abyss_terminate(&env, honeymon->rpc_server);
@@ -122,6 +126,7 @@ honeymon_t* honeymon_quit(honeymon_t* honeymon) {
 	g_cond_clear(&honeymon->rpc_cond);
 #endif
 
+    printf("Clearing main datastructure\n");
     honeymon_free(honeymon);
     return NULL;
 }
