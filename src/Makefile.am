@@ -22,13 +22,14 @@ vmi_honeymon_SOURCES =  vmi-honeymon.c vmi-honeymon.h
 vmi_honeymon_SOURCES += input_parser.c input_parser.h
 vmi_honeymon_SOURCES += xen_helper.c xen_helper.h
 vmi_honeymon_SOURCES += honeypots.c honeypots.h
-vmi_honeymon_SOURCES += scan.c scan.h
+vmi_honeymon_SOURCES += vmi.c vmi.h
 vmi_honeymon_SOURCES += guestfs_helper.c guestfs_helper.h
 vmi_honeymon_SOURCES += log.c log.h
 vmi_honeymon_SOURCES += log_mysql.c log_mysql.h
 vmi_honeymon_SOURCES += rpc_server.c rpc_server.h
 
 AM_CFLAGS = $(CFLAGS)
+AM_CFLAGS += $(VMI_CFLAGS)
 AM_CFLAGS += $(GLIB_CFLAGS)
 AM_CFLAGS += $(XMLRPC_CLIENT_CFLAGS)
 AM_CFLAGS += $(XMLRPC_SERVER_CFLAGS)
@@ -50,6 +51,7 @@ endif
 endif
 
 AM_LDFLAGS = $(LIBS)
+AM_LDFLAGS += $(VMI_LIBS)
 AM_LDFLAGS += $(GLIB_LIBS)
 AM_LDFLAGS += $(XMLRPC_CLIENT_LIBS)
 AM_LDFLAGS += $(XMLRPC_SERVER_LIBS)

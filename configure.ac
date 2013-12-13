@@ -126,7 +126,7 @@ PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.28], [], [AC_ERROR([glib-2.0 (version 2
 AC_CHECK_LIB(glib-2.0, [g_malloc0, g_tree_lookup], [], [AC_ERROR([glib-2.0 library is not functional!])]) 
 AC_CHECK_LIB(pthread, pthread_create, [], [AC_ERROR([Pthread library is not functional!])])
 
-PKG_CHECK_MODULES([LibVMI], [libvmi], [], [AC_ERROR([LibVMI not found])])
+PKG_CHECK_MODULES([VMI], [libvmi], [], [AC_ERROR([LibVMI not found])])
 
 AC_CHECK_HEADER([lvm2app.h], [], [AC_ERROR([No lvm2app.h found])], [[#include <libdevmapper.h>]])
 AC_CHECK_LIB(lvm2app, lvm_lv_snapshot, [], [AC_ERROR([LibLVM (lvm2app) is unusable])])

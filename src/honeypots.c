@@ -32,11 +32,11 @@
 #include <sys/stat.h>
 
 #include "structures.h"
-#include "scan.h"
 #include "log.h"
 #include "honeypots.h"
 #include "xen_helper.h"
 #include "guestfs_helper.h"
+#include "vmi.h"
 
 void honeymon_honeypots_build_list(honeymon_t *honeymon) {
     if (honeymon->workdir == NULL || honeymon->originsdir == NULL) {
@@ -238,117 +238,23 @@ void* honeymon_honeypot_runner(void *input) {
     honeymon_clone_t* clone = (honeymon_clone_t *) input;
     honeymon_t *honeymon = clone->honeymon;
 
-    //printf("Clone thread created for %s\n", clone->clone_name);
-
-    int rc;
-
-    gint64 sleep_cycle;
-
-    while (1) {
-        //printf("Loop start, waiting for clone lock\n");
-        g_mutex_lock(&(clone->lock));
-
-        if (clone->active && clone->finish) {
-            printf(
-                    "Got network signal while scan was already running. Forcing new scan and reverting!\n");
-
-            goto final_scan;
-        }
-
-        if (clone->active && clone->paused) {
-            //printf("Clone is paused, waiting for wake signal!\n");
-
-            // Wait for signal
-            g_cond_wait(&clone->cond, &clone->lock);
-
-            //printf("Clone awaken!\n");
-        }
-
-        if (!clone->active) goto done;
-        if (clone->finish) goto final_scan;
-
-        if (clone->cscan >= clone->nscans && clone->nscans > 0) {
-            printf(
-                    "Clone is still active but ran out of scheduled scans (%i/%i). Switch to network signal.\n",
-                    clone->cscan, clone->nscans);
-            clone->nscans = 0;
-        }
-
-        if (clone->nscans > 0) {
-            //wtf
-            sleep_cycle = g_get_monotonic_time();
-            sleep_cycle += clone->tscan[clone->cscan] * G_TIME_SPAN_SECOND;
-            clone->cscan++;
-
-			if (honeymon->membench) {
-				clone->membench = 1;
-				pthread_attr_t tattr;
-				pthread_attr_init(&tattr);
-				pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-				pthread_create(&(clone->membench_thread), &tattr,
-						honeymon_honeypot_membench, (void *) clone);
-				pthread_attr_destroy(&tattr);
-            }
-
-            rc = g_cond_wait_until(&(clone->cond), &(clone->lock), sleep_cycle);
-
-            printf("Got out of timed cond wait!\n");
-        } else {
-
-            printf(
-                    "No scan schedule was defined, waiting for network event signal.\n");
-            g_cond_wait(&(clone->cond), &(clone->lock));
-            rc = TRUE;
-
-        }
-
-        if (rc == FALSE) {
-            // Regular scan scheduled
-            printf("Regular scan scheduled\n");
-            g_mutex_lock(&(clone->scan_lock));
-            clone->scan_initiator = 0;
-
-            /* TODO LibVMI
-             *
-             * if (!honeymon->stealthy) libxl_domain_pause(honeymon->xen->xl_ctx,
-                    clone->domID);
-
-            int change = honeymon_scan_start_all(clone);
-
-            if (change) {
-                clone->membench = 0;
-                clone->cscan = 0;
-            } else if (!honeymon->stealthy) libxl_domain_unpause(
-                    honeymon->xen->xl_ctx, clone->domID);*/
-
-            g_mutex_unlock(&(clone->scan_lock));
-
-        } else {
-            if (clone->active) {
-                if (!clone->paused) {
-                    // Network event signal received, immediate scan scheduled and pausing VM
-                    printf("Network event signal received!\n");
-                    clone->scan_initiator = 1;
-                    clone->membench = 0;
-
-                    goto final_scan;
-
-                } else {
-                    // if clone is paused, don't do anything
-                    printf("Got signal to pause VM!\n");
-                }
-            } else {
-                //Shutdown signal
-                goto done;
-            }
-        }
-
-        g_mutex_unlock(&(clone->lock));
+    g_mutex_lock(&(clone->lock));
+    if (clone->active && clone->paused) {
+        clone_vmi_init(clone);
+        g_cond_wait(&clone->cond, &clone->lock);
     }
 
-    final_scan: libxl_domain_pause(honeymon->xen->xl_ctx, clone->domID);
-    g_mutex_lock(&(clone->scan_lock));
-    //honeymon_scan_start_all(clone);
+    // shutdown
+    if(!clone->active) goto done;
+
+    // start LibVMI API watcher thread
+    // TODO
+    pthread_create(&(clone->vmi_thread), NULL, clone_vmi_thread,
+            (void *) clone);
+    g_cond_wait(&clone->cond, &clone->lock);
+    pthread_join(clone->vmi_thread, NULL);
+
+    libxl_domain_pause(honeymon->xen->xl_ctx, clone->domID);
 
     printf("Destroying clone %s\n", clone->clone_name);
     libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
@@ -562,25 +468,14 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
 
         clone->domID = domID;
 
-        clone->nscans = honeymon->number_of_scans;
-        clone->scan_threads = malloc(
-                sizeof(pthread_t) * honeymon->number_of_scans);
-        clone->cscan = 0;
-        clone->tscan = malloc(sizeof(uint32_t) * honeymon->number_of_scans);
-
 #ifdef HAVE_LIBGUESTFS
         clone->guestfs=NULL;
 #endif
 
-        int x;
-        for (x = 0; x < honeymon->number_of_scans; x++)
-            clone->tscan[x] = honeymon->scanschedule[x];
-
         g_mutex_init(&(clone->lock));
-        g_mutex_init(&(clone->scan_lock));
         g_cond_init(&(clone->cond));
 
-        pthread_create(&(clone->thread), NULL, honeymon_honeypot_runner,
+        pthread_create(&(clone->signal_thread), NULL, honeymon_honeypot_runner,
                 (void *) clone);
 
         //printf("Inserting it to clone list!\n");
@@ -831,7 +726,7 @@ void honeymon_honeypots_destroy_clone_t(honeymon_clone_t *clone) {
 
     clone->active=false;
     g_cond_signal(&(clone->cond));
-    pthread_join(clone->thread, NULL);
+    pthread_join(clone->signal_thread, NULL);
 
     honeymon_free_clone(clone);
 }

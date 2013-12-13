@@ -39,12 +39,6 @@ void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
 
                 honeymon->workdir = strdup(argv[x + 1]);
                 x += 2;
-            } else if (!strcmp(argv[x], "-scanconf") && x + 1 < argc) {
-                honeymon->scanconf = strdup(argv[x + 1]);
-                x += 2;
-            } else if (!strcmp(argv[x], "-scanschedule") && x + 1 < argc) {
-                honeymon->scanscheduleconf = strdup(argv[x + 1]);
-                x += 2;
             } else if (!strcmp(argv[x], "-mysqluser") && x + 1 < argc) {
                 honeymon->log->mysql_user = strdup(argv[x + 1]);
                 x += 2;
@@ -85,9 +79,6 @@ void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
                 x++;
             } else if (!strcmp(argv[x], "--enable-guestfs")) {
                 honeymon->guestfs_enable = 1;
-                x++;
-            } else if (!strcmp(argv[x], "--membench")) {
-                honeymon->membench = 1;
                 x++;
             } else if (!strcmp(argv[x], "-test") && x + 1 < argc) {
                 honeymon->interactive = 0;

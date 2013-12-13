@@ -82,7 +82,15 @@ rpc_stop_clone(xmlrpc_env * const envP,
 		__attribute__((unused))void * const serverInfo,
 		__attribute__((unused))void * const channelInfo) {
 
-	//TODO
+	char *s = NULL;
+	xmlrpc_decompose_value(envP, paramArrayP, "(s)", &s);
+
+	honeymon_clone_t *clone = honeymon_honeypots_get_free(honeymon, s);
+    if(clone) {
+        g_cond_signal(&(clone->cond));
+    }
+    g_free(s);
+
 	return xmlrpc_build_value(envP, "i", 1);
 }
 

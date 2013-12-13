@@ -144,18 +144,9 @@ typedef struct honeymon {
     GAsyncQueue *clone_requests;
     pthread_t clone_factory;
 
-    char* scanconf;
-    char* scanscheduleconf;
-    GSList* scans; // available volatility scans
-    int number_of_scans;
-    int* scanschedule;
+    win_ver_t winver;
 
     bool guestfs_enable;
-
-    bool membench;
-
-    //int scanpool;
-    //GThreadPool *thpool;
 
 #ifdef HAVE_LIBMAGIC
 magic_t magic_cookie;
@@ -207,6 +198,8 @@ typedef struct honeypot {
     char ip[INET_ADDRSTRLEN];
     char *mac;
 
+    win_ver_t winver;
+
     unsigned int domID; // 0 if not actually running but restorable
     unsigned int clones; // number of active clones
     unsigned int max_clones; // max number of active clones
@@ -223,21 +216,20 @@ typedef struct clone {
     char* clone_name;
     char* config_path;
 
-    vmi_instance_t vmi;
-
     lv_t clone_lv;
 
     uint16_t vlan;
     uint32_t domID;
 
     // thread stuff
-    pthread_t thread;
+    pthread_t signal_thread;
+    pthread_t vmi_thread;
+
     GMutex lock;
     GMutex scan_lock;
     GCond cond;
     bool active;
     bool paused;
-    bool finish;
 
     // scan scheduling
     uint32_t nscans; // number of scans to be scheduled
@@ -250,6 +242,11 @@ typedef struct clone {
     // log IDX
     uint32_t logIDX;
     uint32_t start_time;
+
+    // VMI
+    int interrupted;
+    page_mode_t pm;
+    vmi_instance_t vmi;
 
     // memory benchmark
     bool membench;

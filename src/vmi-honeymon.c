@@ -96,7 +96,6 @@ void honeymon_free(honeymon_t* honeymon) {
         g_free(honeymon->honeypotsdir);
         g_free(honeymon->backupdir);
         g_free(honeymon->virusdir);
-        g_free(honeymon->scanconf);
         honeymon_xen_free_interface(honeymon->xen);
         g_async_queue_unref(honeymon->clone_requests);
         lvm_quit(honeymon->lvm);
@@ -131,61 +130,6 @@ honeymon_t* honeymon_quit(honeymon_t* honeymon) {
     return NULL;
 }
 
-void honeymon_scanlist_init(honeymon_t *honeymon) {
-    FILE *file;
-    if (NULL != (file = fopen(honeymon->scanconf, "r"))) {
-        if (honeymon->scans != NULL) g_slist_free_full(honeymon->scans,
-                (GDestroyNotify) free);
-
-        char scan[32];
-        while (fgets(scan, 32, file)) {
-            char *nlptr = strchr(scan, '\n');
-            if (nlptr) *nlptr = '\0';
-            char *save_scan = strdup(scan);
-            printf("\tEnabling scan: %s\n", save_scan);
-            honeymon->scans = g_slist_append(honeymon->scans, save_scan);
-        }
-
-        fclose(file);
-    } else {
-        printf("%s doesn't exists!\n", honeymon->scanconf);
-    }
-}
-
-//TODO
-void honeymon_scanpool_init(honeymon_t *honeymon) {
-
-}
-
-void honeymon_scanschedule_init(honeymon_t *honeymon) {
-    FILE *file;
-    if (NULL != (file = fopen(honeymon->scanscheduleconf, "r"))) {
-        if (honeymon->scanschedule != NULL) free(honeymon->scanschedule);
-
-        char line[32];
-        int line_number = -1;
-
-        while (fgets(line, 32, file)) {
-            char *nlptr = strchr(line, '\n');
-            if (nlptr) *nlptr = '\0';
-            int number = atoi(line);
-
-            if (line_number == -1) {
-                honeymon->scanschedule = malloc(sizeof(int) * number);
-                honeymon->number_of_scans = number;
-            } else if (honeymon->number_of_scans > line_number) {
-                honeymon->scanschedule[line_number] = number;
-                printf("\tAddig scan interval: %i\n", number);
-            }
-
-            line_number++;
-        }
-
-        fclose(file);
-    } else {
-        printf("%s doesn't exists!\n", honeymon->scanscheduleconf);
-    }
-}
 void honeymon_workdir_init(honeymon_t *honeymon) {
 
     if (honeymon->workdir == NULL) {
@@ -349,24 +293,6 @@ void honeymon_shell(honeymon_t* honeymon) {
                 } else {
                     printf("Current workdir is %s\n", honeymon->workdir);
                 }
-            } else if (!strcmp(command, "scanconf")) {
-                if (option != NULL) {
-                    g_free(honeymon->scanconf);
-                    honeymon->scanconf = strdup(option);
-                    honeymon_scanlist_init(honeymon);
-                } else {
-                    printf("Current Scan config path is %s\n",
-                            honeymon->scanconf);
-                }
-            } else if (!strcmp(command, "scanschedule")) {
-                if (option != NULL) {
-                    g_free(honeymon->scanscheduleconf);
-                    honeymon->scanscheduleconf = strdup(option);
-                    honeymon_scanschedule_init(honeymon);
-                } else {
-                    printf("Current Scan schedule config path is %s\n",
-                            honeymon->scanscheduleconf);
-                }
             } else if (!strcmp(command, "designate") || !strcmp(command, "d")) {
                 if (option != NULL) {
                     honeymon_xen_designate_vm(honeymon, option);
@@ -435,16 +361,6 @@ int main(int argc, char **argv) {
     if (honeymon->workdir != NULL) {
         honeymon_workdir_init(honeymon);
     }
-
-    if (honeymon->scanconf != NULL) {
-        honeymon_scanlist_init(honeymon);
-    }
-
-    if (honeymon->scanscheduleconf != NULL) {
-        honeymon_scanschedule_init(honeymon);
-    }
-
-    honeymon_scanpool_init(honeymon);
 
     honeymon_init_honeypot_lists(honeymon);
 
