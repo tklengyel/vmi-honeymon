@@ -11,4 +11,4 @@ print "Server replied with: ".$resp->value."\n";
 
 print "get_random_clone()\n";
 $resp = $cli->send_request('get_random_clone');
-print "Server replied with: ".$resp->value."\n";
+print "Server replied with: ". @{$resp->value}[0] ." VLAN ". @{$resp->value}[1] ."\n";
