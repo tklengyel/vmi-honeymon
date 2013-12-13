@@ -52,7 +52,7 @@ XLU_Config* honeymon_xen_domconfig_by_id(honeymon_xen_interface_t *xen,
 void honeymon_xen_free_domconfig(XLU_Config *config);
 int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom);
 void honeymon_xen_restore(honeymon_t *honeymon, char *option);
-int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom);
+int honeymon_xen_clone_vm(honeymon_t* honeymon, const char* dom);
 int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom);
 char *honeymon_xen_first_vif_mac(XLU_Config2 *config);
 char *honeymon_xen_first_disk_path(XLU_Config2 *config);

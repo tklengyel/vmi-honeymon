@@ -51,12 +51,12 @@ rpc_get_clone(xmlrpc_env * const envP,
 	if (clone) {
 		g_async_queue_push(honeymon->clone_requests, strdup(s));
 		honeymon_honeypots_unpause_clones2(clone->clone_name, clone, NULL);
-		return xmlrpc_build_value(envP, "(sd)", clone->clone_name, clone->vlan);
+		return xmlrpc_build_value(envP, "(si)", clone->clone_name, clone->vlan);
 	}
 
 	g_free(s);
 
-	return xmlrpc_build_value(envP, "(sd)", "-", 0);
+	return xmlrpc_build_value(envP, "(si)", "-", 0);
 }
 
 static xmlrpc_value *
@@ -70,10 +70,10 @@ rpc_get_random_clone(xmlrpc_env * const envP,
 	if (clone) {
 		g_async_queue_push(honeymon->clone_requests, strdup(clone->clone_name));
 		honeymon_honeypots_unpause_clones2(clone->clone_name, clone, NULL);
-		return xmlrpc_build_value(envP, "(sd)", clone->clone_name, clone->vlan);
+		return xmlrpc_build_value(envP, "(si)", clone->clone_name, clone->vlan);
 	}
 
-	return xmlrpc_build_value(envP, "(sd)", "-", 0);
+	return xmlrpc_build_value(envP, "(si)", "-", 0);
 }
 
 static xmlrpc_value *

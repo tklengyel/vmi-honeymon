@@ -107,7 +107,7 @@ void honeymon_free(honeymon_t* honeymon) {
 
 honeymon_t* honeymon_quit(honeymon_t* honeymon) {
 
-    g_mutex_lock(&honeymon->lock);
+    //g_mutex_lock(&honeymon->lock);
 
     printf("Clearing honeypots\n");
     g_tree_destroy(honeymon->honeypots);

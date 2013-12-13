@@ -150,16 +150,16 @@ char *honeymon_xen_first_disk_path(XLU_Config2 *config) {
     return ret;
 }
 
-int get_dom_info(honeymon_xen_interface_t *xen, char *input, uint32_t *domID,
+int get_dom_info(honeymon_xen_interface_t *xen, const char *input, uint32_t *domID,
 		char **name) {
 
-	uint32_t _domID;
+	uint32_t _domID = INVALID_DOMID;
 	char *_name = NULL;
 
 	sscanf(input, "%u", &_domID);
 
-	if (!_domID) {
-        _name = input;
+	if (_domID == INVALID_DOMID) {
+        _name = strdup(input);
 		libxl_name_to_domid(xen->xl_ctx, input, &_domID);
 		if (!_domID || _domID == INVALID_DOMID) {
 			printf("Domain is not running, failed to get domID from name!\n");
@@ -222,7 +222,7 @@ int get_config_vifs(XLU_Config2 *config, XLU_ConfigList2 **vifs) {
 	return 1;
 }
 
-int honeymon_xen_clone_vm(honeymon_t* honeymon, char* dom) {
+int honeymon_xen_clone_vm(honeymon_t* honeymon, const char* dom) {
 
     honeymon_xen_interface_t *xen = honeymon->xen;
     honeymon_honeypot_t *honeypot = NULL;
