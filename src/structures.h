@@ -209,6 +209,23 @@ typedef struct honeypot {
     GSList* fschecksum; // each node is a GTree with the file path as key and hash as value
 } honeymon_honeypot_t;
 
+struct symbol {
+    char *name;
+    uint64_t rva;
+};
+
+struct config {
+    char *name;
+    char **guids;
+    struct symbol *syms;
+    uint64_t *sym_count;
+};
+
+struct sym_lookup {
+    struct config *conf;
+    GTree *rva_lookup;
+};
+
 typedef struct clone {
     honeymon_t* honeymon;
     honeymon_honeypot_t* origin;
@@ -247,6 +264,7 @@ typedef struct clone {
     int interrupted;
     page_mode_t pm;
     vmi_instance_t vmi;
+    GTree *sym_lookup; // key: both PE and PDB GUIDs
 
     // memory benchmark
     bool membench;
