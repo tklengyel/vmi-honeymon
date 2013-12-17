@@ -47,6 +47,8 @@
 #define BIT64 1
 #define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
 
+#define TRAP 0xCC
+
 enum offset_t {
     EPROCESS_PID,
     EPROCESS_PDBASE,
@@ -77,14 +79,64 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
     },
 };
 
+gint intcmp(gconstpointer v1, gconstpointer v2,
+        __attribute__((unused))      gconstpointer unused) {
+    return (*(uint64_t *) v1 < (*(uint64_t *) v2) ? 1 :
+            (*(uint64_t *) v1 == (*(uint64_t *) v2)) ? 0 : -1);
+}
+
 void inject_traps(honeymon_clone_t *clone) {
-    if(PM2BIT(clone->pm)==BIT64) {
-        
-    }
+
+    vmi_instance_t vmi = clone->vmi;
+    addr_t next_module, list_head;
+
+    // Loop kernel modules
+    vmi_read_addr_ksym(vmi, "PsLoadedModuleList", &next_module);
+    list_head = next_module;
+
+    while (1) {
+
+        addr_t tmp_next = 0;
+        vmi_read_addr_va(vmi, next_module, 0, &tmp_next);
+
+        if (list_head == tmp_next) {
+            break;
+        }
+
+        char *pe_guid = NULL, *pdb_guid = NULL;
+        get_guid(vmi, next_module, 0, &pe_guid, &pdb_guid);
+
+        struct sym_lookup *s = NULL;
+        if(pdb_guid) {
+            s=g_tree_lookup(clone->sym_lookup, pdb_guid);
+        } else if(pe_guid) {
+            s=g_tree_lookup(clone->sym_lookup, pe_guid);
+        }
+
+        if(s) {
+            uint32_t i=0;
+            uint8_t trap = TRAP;
+            for(; i < *(s->conf->sym_count); i++) {
+                //backup current byte
+                vmi_read_8_va(vmi, next_module + s->conf->syms[i].rva, 0, &s->conf->syms[i].backup);
+
+                //add trap
+                vmi_write_8_va(vmi, next_module + s->conf->syms[i].rva, 0, &trap);
+
+                printf("Trap added @ VA 0x%lx for %s!%s\n", next_module + s->conf->syms[i].rva, s->conf->name, s->conf->syms[i].name);
+            }
+        }
+
+        g_free(pe_guid);
+        g_free(pdb_guid);
+
+        next_module = tmp_next;
+    };
 }
 
 void *clone_vmi_thread(void *input) {
-
+    pthread_exit(0);
+    return NULL;
 }
 
 void clone_vmi_init(honeymon_clone_t *clone) {
@@ -95,7 +147,7 @@ void clone_vmi_init(honeymon_clone_t *clone) {
 
     /* partialy initialize the libvmi library */
     if (vmi_init_custom(&clone->vmi, VMI_XEN | VMI_INIT_PARTIAL | VMI_CONFIG_GHASHTABLE, (vmi_config_t)config) == VMI_FAILURE) {
-        return 0;
+        return;
     }
 
     clone->pm=vmi_get_page_mode(clone->vmi);
@@ -113,11 +165,28 @@ void clone_vmi_init(honeymon_clone_t *clone) {
         if (clone->vmi != NULL ) {
             vmi_destroy(clone->vmi);
         }
-        return 0;
-    }
-    else{
-        printf("LibVMI init succeeded!\n");
+        return;
     }
     g_hash_table_destroy(config);
 
+
+    // Crete Binary search trees to lokup symbols from
+    clone->sym_lookup = g_tree_new((GCompareFunc)strcmp);
+
+    if(PM2BIT(clone->pm) == BIT64) {
+        uint32_t i=0;
+        for(;i<win7_sp1_x64_config_count;i++) {
+            struct sym_lookup *s = malloc(sizeof(struct sym_lookup));
+            s->conf = &win7_sp1_x64_configs[i];
+            s->rva_lookup = g_tree_new((GCompareFunc)intcmp);
+
+            uint32_t z=0;
+            for(; z < *(s->conf->sym_count) ; z++) {
+                g_tree_insert(s->rva_lookup, &s->conf->syms[z].rva, s->conf->syms[z].name);
+            }
+
+            g_tree_insert(clone->sym_lookup, s->conf->guids[0], s);
+            g_tree_insert(clone->sym_lookup, s->conf->guids[1], s);
+        }
+    }
 }
