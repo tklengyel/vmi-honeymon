@@ -12,8 +12,8 @@ class DummyOmap(object):
     def remap(self, addr):
         return addr
 
-class Lookup(folder, object):
-    def __init__(self, pdbname):
+class Lookup(object):
+    def __init__(self, folder, pdbname):
         self.addrs = {}
         self._cache = {}
 
@@ -27,11 +27,6 @@ class Lookup(folder, object):
         if not os.path.exists("./%s/%s" % (folder, pdbname)):
             print "WARN: %s not found" % pdbname
         try:
-            header = open("%s.h" % pdbbase, 'w')
-
-            header.write("const char *%s_guid[2] = {\n\t\"%s\",\n\t\"%s\"\n\t};\n" %(pdbbase, pe_guid, pdb_guid))
-            header.write("const struct symbol %s[] = {\n" % pdbbase)
-
             print "Loading symbols for %s..." % pdbbase
             # Do this the hard way to avoid having to load
             # the types stream in mammoth PDB files
@@ -70,10 +65,14 @@ class Lookup(folder, object):
         self.addrs[0,limit]['addrs'] = []
 
         sym_counter = []
-        specials = '@\':`~ <>*,?'+chr(94)
+        specials = '@\':`~ <>*,?.'
         trans = string.maketrans(specials, '_'*len(specials))
 
         counter = 0;
+
+        header = open("%s.h" % pdbbase.translate(trans), 'w')
+        header.write("const char *%s_guid[2] = {\n\t\"%s\",\n\t\"%s\"\n\t};\n" %(pdbbase.translate(trans), pe_guid, pdb_guid))
+        header.write("const struct symbol %s[] = {\n" % pdbbase.translate(trans))
 
         for sym in gsyms.globals:
 
@@ -106,8 +105,9 @@ class Lookup(folder, object):
                 header.write("\t{.name = \"%s\", .rva = 0x%lx},\n" % (sym_name, mapped))
 
         header.write("\n};\n");
-        header.write("const uint64_t %s_count = %u;\n" %(pdbbase, counter))
+        header.write("const uint64_t %s_count = %u;\n" %(pdbbase.translate(trans), counter))
         header.close()
+        print "\tSymbols found: %u" % counter
 
 if __name__ == "__main__":
     lobj = Lookup(sys.argv[1], sys.argv[2])
