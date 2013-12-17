@@ -12,7 +12,7 @@ class DummyOmap(object):
     def remap(self, addr):
         return addr
 
-class Lookup(object):
+class Lookup(folder, object):
     def __init__(self, pdbname):
         self.addrs = {}
         self._cache = {}
@@ -24,7 +24,7 @@ class Lookup(object):
         pe_guid = guids.partition(":")[0]
         pdb_guid = guids.partition(":")[2]
 
-        if not os.path.exists(pdbname):
+        if not os.path.exists("./%s/%s" % (folder, pdbname)):
             print "WARN: %s not found" % pdbname
         try:
             header = open("%s.h" % pdbbase, 'w')
@@ -35,7 +35,7 @@ class Lookup(object):
             print "Loading symbols for %s..." % pdbbase
             # Do this the hard way to avoid having to load
             # the types stream in mammoth PDB files
-            pdb = pdbparse.parse(pdbname, fast_load=True)
+            pdb = pdbparse.parse("./%s/%s" % (folder, pdbname), fast_load=True)
             pdb.STREAM_DBI.load()
             pdb._update_names()
             pdb.STREAM_GSYM = pdb.STREAM_GSYM.reload()
@@ -48,8 +48,8 @@ class Lookup(object):
             pdb.STREAM_SECT_HDR_ORIG = pdb.STREAM_SECT_HDR_ORIG.reload()
             pdb.STREAM_SECT_HDR_ORIG.load()
 
-        except AttributeError, e:
-            pass
+        except:
+            return
 
         try:
             sects = pdb.STREAM_SECT_HDR_ORIG.sections
@@ -110,10 +110,4 @@ class Lookup(object):
         header.close()
 
 if __name__ == "__main__":
-
-    if not sys.stdin.isatty():
-        input = sys.stdin.readline()
-        input=input.strip('\r\n')
-        lobj = Lookup(input)
-    else:
-        print "Input has to be piped into this script"
+    lobj = Lookup(sys.argv[1], sys.argv[2])

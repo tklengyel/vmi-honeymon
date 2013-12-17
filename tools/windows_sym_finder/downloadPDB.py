@@ -97,8 +97,12 @@ def download_file(guid,fname,path="",verbose=False):
                     print "HTTP error %u" % (e.code)
     return None
 
-def handle_pe(pe_file):
-    dbgdata, tp = get_pe_debug_data(pe_file)
+def handle_pe(folder, pe_file):
+    try:
+        dbgdata, tp = get_pe_debug_data(pe_file)
+    except:
+        return
+
     pe_header =  PE(pe_file, fast_load=True)
     pe_guid = "%.8x%.5x" % (pe_header.FILE_HEADER.TimeDateStamp, pe_header.OPTIONAL_HEADER.SizeOfImage)
     # print "PE GUID: %s" % pe_guid
@@ -147,8 +151,8 @@ def handle_pe(pe_file):
 
     if saved_file.endswith("_"):
         os.system("cabextract -q %s" % saved_file)
-        os.system("rm %s" % saved_file)
-        os.system("mv %s %s" % (filename, pdb))
+        os.system("find . -maxdepth 1 -iname \"%s\" -exec rm {} \;" % saved_file)
+        os.system("find . -maxdepth 1 -iname \"%s\" -exec mv {} ./%s/%s \;" % (filename, folder, pdb))
         print "%s" % pdb
 
 def get_pe_from_pe(filename):
@@ -160,11 +164,7 @@ def get_pe_from_pe(filename):
 
 def main():
     global SYM_URLS
-
-    if not sys.stdin.isatty():
-        input = sys.stdin.readline()
-        input=input.strip('\r\n')
-        handle_pe(input)
+    handle_pe(sys.argv[1], sys.argv[2])
         
 if __name__ == "__main__":
     main()
