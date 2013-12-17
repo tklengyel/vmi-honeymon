@@ -9,7 +9,9 @@ Mount the disk of the Windows VM in /mnt
 3)
     mkdir win7_sp1_x64_headers
     mv *.h win7_sp1_x64_headers
+    mv win7_sp1_x64 win7_sp1_x64_pdbs
+    mv win7_sp1_x64_headers win7_sp1_x64
 
 4)
 Create config header:
-    ./createConfig win7_sp1_x64_headers
+    ./createConfig win7_sp1_x64

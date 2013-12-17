@@ -13,21 +13,24 @@ struct symbol {
 
 struct config {
     char *name;
-    const char **guids;
-    const struct symbol *syms;
-    const uint64_t *sym_count;
+    char **guids;
+    struct symbol *syms;
+    uint64_t *sym_count;
 };
 
 #include "config.h"
 
 int main(int argc, char **argv) {
 
-    printf("We have %u symbol headers compiled in\n", config_count);
+    printf("We have %u symbol headers compiled in\n", win7_sp1_x64_config_count);
 
     int i;
-    for(i=0;i<config_count;i++) {
+    for(i=0;i<win7_sp1_x64_config_count;i++) {
         printf("Config name: %s. PE GUID: %s. PDB GUID: %s. Symbols %u\n",
-            configs[i].name, configs[i].guids[0], configs[i].guids[1], *configs[i].sym_count);
+            win7_sp1_x64_configs[i].name,
+            win7_sp1_x64_configs[i].guids[0],
+            win7_sp1_x64_configs[i].guids[1],
+            *win7_sp1_x64_configs[i].sym_count);
 
         /*int z;
         for(z=0;z<*configs[i].sym_count;z++) {

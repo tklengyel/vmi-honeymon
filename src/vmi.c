@@ -38,7 +38,10 @@
 
 #include "structures.h"
 #include "log.h"
+#include "win-guid.h"
 #include "vmi.h"
+
+#include "win7_sp1_x64_config.h"
 
 #define BIT32 0
 #define BIT64 1
@@ -74,6 +77,12 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
     },
 };
 
+void inject_traps(honeymon_clone_t *clone) {
+    if(PM2BIT(clone->pm)==BIT64) {
+        
+    }
+}
+
 void *clone_vmi_thread(void *input) {
 
 }
@@ -92,10 +101,11 @@ void clone_vmi_init(honeymon_clone_t *clone) {
     clone->pm=vmi_get_page_mode(clone->vmi);
     vmi_destroy(clone->vmi);
 
-    g_hash_table_insert(config, "win_tasks", &offsets[clone->origin->winver][PM2BIT(clone->pm)][EPROCESS_TASKS]);
-    g_hash_table_insert(config, "win_pdbase", &offsets[clone->origin->winver][PM2BIT(clone->pm)][EPROCESS_PDBASE]);
-    g_hash_table_insert(config, "win_pid", &offsets[clone->origin->winver][PM2BIT(clone->pm)][EPROCESS_PID]);
-    g_hash_table_insert(config, "win_pname", &offsets[clone->origin->winver][PM2BIT(clone->pm)][EPROCESS_PNAME]);
+    //TODO: don't harcode VMI_OS_WINDOWS_7
+    g_hash_table_insert(config, "win_tasks", &offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][EPROCESS_TASKS]);
+    g_hash_table_insert(config, "win_pdbase", &offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][EPROCESS_PDBASE]);
+    g_hash_table_insert(config, "win_pid", &offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][EPROCESS_PID]);
+    g_hash_table_insert(config, "win_pname", &offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][EPROCESS_PNAME]);
 
     // Initialize the libvmi library.
     if (vmi_init_custom(&clone->vmi, VMI_XEN | VMI_INIT_COMPLETE | VMI_INIT_EVENTS | VMI_CONFIG_GHASHTABLE, (vmi_config_t)config) == VMI_FAILURE) {

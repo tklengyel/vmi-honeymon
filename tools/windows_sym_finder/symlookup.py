@@ -71,8 +71,8 @@ class Lookup(object):
         counter = 0;
 
         header = open("%s.h" % pdbbase.translate(trans), 'w')
-        header.write("const char *%s_guid[2] = {\n\t\"%s\",\n\t\"%s\"\n\t};\n" %(pdbbase.translate(trans), pe_guid, pdb_guid))
-        header.write("const struct symbol %s[] = {\n" % pdbbase.translate(trans))
+        header.write("static char *%s_%s_guid[2] = {\n\t\"%s\",\n\t\"%s\"\n\t};\n" %(folder, pdbbase.translate(trans), pe_guid, pdb_guid))
+        header.write("static struct symbol %s_%s[] = {\n" % (folder, pdbbase.translate(trans)))
 
         for sym in gsyms.globals:
 
@@ -105,7 +105,7 @@ class Lookup(object):
                 header.write("\t{.name = \"%s\", .rva = 0x%lx},\n" % (sym_name, mapped))
 
         header.write("\n};\n");
-        header.write("const uint64_t %s_count = %u;\n" %(pdbbase.translate(trans), counter))
+        header.write("static uint64_t %s_%s_count = %u;\n" %(folder, pdbbase.translate(trans), counter))
         header.close()
         print "\tSymbols found: %u" % counter
 
