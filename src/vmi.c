@@ -143,7 +143,7 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
                 g_tree_insert(clone->pa_lookup, &s->conf->syms[i].pa, &s->conf->syms[i]);
 
                 trapped++;
-                //printf("Trap added @ VA 0x%lx for %s!%s\n", dllbase + s->conf->syms[i].rva, s->conf->name, s->conf->syms[i].name);
+                printf("\t\tTrap added @ VA 0x%lx PA 0x%lx for %s!%s\n", vaddr + s->conf->syms[i].rva, s->conf->syms[i].pa, s->conf->name, s->conf->syms[i].name);
             }
 
             printf("\tInjected %lu traps into PE with GUID %s:%s\n", trapped, pe_guid, pdb_guid);
@@ -177,7 +177,7 @@ void inject_traps_modules(honeymon_clone_t *clone, addr_t list_head, vmi_pid_t p
             return;
         }
 
-            /*unicode_string_t *us = NULL;
+            unicode_string_t *us = NULL;
             if (VMI_PM_IA32E == vmi_get_page_mode(vmi)) {
                 us = vmi_read_unicode_str_va(vmi, next_module + 0x58, pid);
             } else {
@@ -187,10 +187,10 @@ void inject_traps_modules(honeymon_clone_t *clone, addr_t list_head, vmi_pid_t p
             unicode_string_t out = { 0 };
             if (us &&
                 VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
-                printf("%s\n", out.contents);
+                printf("\t%s\n", out.contents);
                 free(out.contents);
             }   // if
-            if (us) vmi_free_unicode_str(us);*/
+            if (us) vmi_free_unicode_str(us);
 
         inject_traps_pe(clone, dllbase, pid);
 
@@ -253,7 +253,9 @@ void int3_cb2(vmi_instance_t vmi, vmi_event_t *event) {
     //add trap back
     uint8_t trap = TRAP;
     honeymon_clone_t *clone = event->data;
+    printf("Int3cb2, putting trap back @ PA 0x%lx!\n", clone->trap_reset);
     vmi_write_8_pa(vmi, clone->trap_reset, &trap);
+    clone->trap_reset = 0;
 }
 
 void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
@@ -265,9 +267,11 @@ void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
     addr_t pa = (event->interrupt_event.gfn<<12) + event->interrupt_event.offset;
     struct symbol *s = g_tree_lookup(clone->pa_lookup, &pa);
 
+    addr_t test = vmi_translate_uv2p(vmi, event->interrupt_event.gla, pid);
+
     if(s) {
-        printf("Int 3 happened: PID: %"PRIi32" GFN=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
-          pid, event->interrupt_event.gfn, event->interrupt_event.gla, s->conf->name, s->name);
+        printf("Int 3 happened: PID: %"PRIi32" PA=%"PRIx64" TEST=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
+          pid, pa, test, event->interrupt_event.gla, s->conf->name, s->name);
 
         // remove trap
         clone->trap_reset = pa;
@@ -285,6 +289,7 @@ void *clone_vmi_thread(void *input) {
     vmi_event_t interrupt_event;
     memset(&interrupt_event, 0, sizeof(vmi_event_t));
     interrupt_event.type = VMI_EVENT_INTERRUPT;
+    interrupt_event.interrupt_event.intr = INT3;
     interrupt_event.interrupt_event.enabled = 1;
     interrupt_event.callback = int3_cb;
     interrupt_event.data = clone;
