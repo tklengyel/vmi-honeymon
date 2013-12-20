@@ -166,7 +166,7 @@
 #include "win7_sp1_x64/ipsecsvc.h"
 #include "win7_sp1_x64/mprapi.h"
 #include "win7_sp1_x64/UxTheme.h"
-static uint64_t win7_sp1_x64_config_count = 167;
+static uint64_t win7_sp1_x64_config_count = 166;
 static struct config win7_sp1_x64_configs[] = {
 	{.name="win7_sp1_x64_wbemcntl", .guids=win7_sp1_x64_wbemcntl_guid, .syms=win7_sp1_x64_wbemcntl, .sym_count=&win7_sp1_x64_wbemcntl_count},
 	{.name="win7_sp1_x64_cryptui", .guids=win7_sp1_x64_cryptui_guid, .syms=win7_sp1_x64_cryptui, .sym_count=&win7_sp1_x64_cryptui_count},

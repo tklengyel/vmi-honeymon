@@ -25,5 +25,5 @@
 
 void *clone_vmi_thread(void *input);
 void clone_vmi_init(honeymon_clone_t *clone);
-
+void free_guid_lookup(gpointer s);
 #endif

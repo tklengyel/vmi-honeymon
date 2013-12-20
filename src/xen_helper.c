@@ -517,12 +517,9 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
             snprintf(NULL, 0, "%s/%s.origin", honeymon->originsdir, name) + 1);
     char *output_config = malloc(
             snprintf(NULL, 0, "%s/%s.config", honeymon->originsdir, name) + 1);
-    char *output_profile = malloc(
-            snprintf(NULL, 0, "%s/%s.profile", honeymon->originsdir, name) + 1);
     char *output_ip = malloc(snprintf(NULL, 0, "%s/%s.ip", honeymon->originsdir, name) + 1);
     sprintf(output, "%s/%s.origin", honeymon->originsdir, name);
     sprintf(output_config, "%s/%s.config", honeymon->originsdir, name);
-    sprintf(output_profile, "%s/%s.profile", honeymon->originsdir, name);
     sprintf(output_ip, "%s/%s.ip", honeymon->originsdir, name);
 
     struct stat buf;
@@ -536,14 +533,14 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
             config->config_length, output_config, "header");
     close(cfd);
 
-    char *command = malloc(
-            snprintf(NULL, 0, "%s save %u %s", XL, domID, output) + 1);
-    sprintf(command, "%s save %u %s", XL, domID, output);
+    char *command = g_malloc0(
+            snprintf(NULL, 0, "%s -v save %u %s", XL, domID, output) + 1);
+    sprintf(command, "%s -v save %u %s", XL, domID, output);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 
-    command = malloc(snprintf(NULL, 0, "%s restore -p %s", XL, output) + 1);
+    command = g_malloc0(snprintf(NULL, 0, "%s restore -p %s", XL, output) + 1);
     sprintf(command, "%s restore -p %s", XL, output);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
@@ -596,7 +593,6 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
     free(name);
     free(output);
     free(output_config);
-    free(output_profile);
     free(output_ip);
     return 0;
 }

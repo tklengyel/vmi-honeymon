@@ -240,7 +240,6 @@ void* honeymon_honeypot_runner(void *input) {
 
     g_mutex_lock(&(clone->lock));
     if (clone->active && clone->paused) {
-        clone_vmi_init(clone);
         g_cond_wait(&clone->cond, &clone->lock);
     }
 
@@ -248,13 +247,16 @@ void* honeymon_honeypot_runner(void *input) {
     if(!clone->active) goto done;
 
     // start LibVMI API watcher thread
-    // TODO
     pthread_create(&(clone->vmi_thread), NULL, clone_vmi_thread,
             (void *) clone);
+
+    // wait for end signal
     g_cond_wait(&clone->cond, &clone->lock);
-    pthread_join(clone->vmi_thread, NULL);
 
     libxl_domain_pause(honeymon->xen->xl_ctx, clone->domID);
+
+    clone->interrupted = 1;
+    pthread_join(clone->vmi_thread, NULL);
 
     printf("Destroying clone %s\n", clone->clone_name);
     libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
@@ -370,10 +372,14 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         FILE *file = fopen(origin->ip_path, "r");
         if (file != NULL) {
             char *p = fgets(origin->ip, INET_ADDRSTRLEN, file);
-            char *nl = strrchr(p, '\r');
-            if (nl) *nl = '\0';
-            nl = strrchr(p, '\n');
-            if (nl) *nl = '\0';
+            if(p) {
+                char *nl = strrchr(p, '\r');
+                if (nl) *nl = '\0';
+                nl = strrchr(p, '\n');
+                if (nl) *nl = '\0';
+            } else {
+                printf("Empty file, IP is missing!\n");
+            }
             fclose(file);
         } else {
             printf("IP is missing\n");
@@ -474,6 +480,8 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
 
         g_mutex_init(&(clone->lock));
         g_cond_init(&(clone->cond));
+
+        clone_vmi_init(clone);
 
         pthread_create(&(clone->signal_thread), NULL, honeymon_honeypot_runner,
                 (void *) clone);
@@ -706,10 +714,10 @@ honeymon_clone_t *honeymon_honeypots_get_free(honeymon_t *honeymon,
 void honeymon_free_clone(honeymon_clone_t *clone) {
     if (clone) {
         g_mutex_clear(&(clone->lock));
-        g_mutex_clear(&(clone->scan_lock));
         g_cond_clear(&(clone->cond));
 
         honeymon_guestfs_stop(clone);
+        close_vmi_clone(clone);
 
         g_free(clone->clone_name);
         g_free(clone->origin_name);

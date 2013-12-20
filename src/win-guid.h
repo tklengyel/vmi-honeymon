@@ -24,6 +24,7 @@
 #include <libvmi/libvmi.h>
 #include <libvmi/peparse.h>
 
-void get_guid(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid, char **pe_guid, char **pdb_guid);
+status_t get_guid(vmi_instance_t vmi, addr_t vaddr, uint32_t pid, char **pe_guid, char **pdb_guid);
+//status_t get_guid2(vmi_instance_t vmi, const char *mod_name, addr_t base_vaddr, uint32_t pid, char **guid, char **filename);
 
 #endif

@@ -79,6 +79,14 @@ struct cv_info_pdb70 {
   uint8_t       pdb_file_name[];
 } __attribute__ ((packed));
 
+struct cv_info_nb10 {
+    uint32_t cv_signature;
+    uint32_t offset;
+    uint32_t timestamp;
+    uint32_t age;
+    uint8_t  pdb_file_name[];
+} __attribute__ ((packed));
+
 status_t is_WINDOWS_KERNEL(vmi_instance_t vmi, addr_t base_p, uint8_t *pe) {
 
     status_t ret = VMI_FAILURE;
@@ -166,13 +174,24 @@ status_t is_WINDOWS_KERNEL(vmi_instance_t vmi, addr_t base_p, uint8_t *pe) {
 
     printf("\n");
 
-}
+}*/
 
-void print_guid(vmi_instance_t vmi, addr_t kernel_base_p, uint8_t* pe) {
+status_t get_guid(vmi_instance_t vmi, addr_t base_vaddr, uint32_t pid, char **pe_guid, char **pdb_guid) {
 
-    uint16_t major_os_version;
-    uint16_t minor_os_version;
-    uint32_t size_of_image;
+    status_t ret=VMI_FAILURE;
+
+    if(pe_guid==NULL || pdb_guid==NULL) return ret;
+
+    uint8_t pe[MAX_HEADER_SIZE];
+
+    if(VMI_FAILURE == peparse_get_image_virt(vmi, base_vaddr, pid, MAX_HEADER_SIZE, pe)) {
+        printf("Failed to read PE header @ %u:0x%lx\n", pid, base_vaddr);
+        return ret;
+    }
+
+    uint16_t major_os_version = 0;
+    uint16_t minor_os_version = 0;
+    uint32_t size_of_image = 0;
 
     struct pe_header *pe_header = NULL;
     uint16_t optional_header_type = 0;
@@ -187,232 +206,73 @@ void print_guid(vmi_instance_t vmi, addr_t kernel_base_p, uint8_t* pe) {
         major_os_version=oh32->major_os_version;
         minor_os_version=oh32->minor_os_version;
         size_of_image=oh32->size_of_image;
-
     } else
     if(optional_header_type == IMAGE_PE32_PLUS_MAGIC) {
 
         major_os_version=oh32plus->major_os_version;
         minor_os_version=oh32plus->minor_os_version;
         size_of_image=oh32plus->size_of_image;
-
     }
 
     struct image_debug_directory debug_directory;
-    vmi_read_pa(vmi, kernel_base_p + debug_offset, (uint8_t *)&debug_directory, sizeof(struct image_debug_directory));
+    size_t read=vmi_read_va(vmi, base_vaddr + debug_offset, pid, (uint8_t *)&debug_directory, sizeof(struct image_debug_directory));
 
-    printf("\tPE GUID: %.8x%.5x\n",pe_header->time_date_stamp,size_of_image);
+    if(read == sizeof(struct image_debug_directory)) {
+        *pe_guid=malloc(snprintf(NULL,0,"%.8x%.5x", pe_header->time_date_stamp, size_of_image)+1);
+        sprintf(*pe_guid, "%.8x%.5x", pe_header->time_date_stamp, size_of_image);
+        ret = VMI_SUCCESS;
+    }
 
-    if(debug_directory.type == IMAGE_DEBUG_TYPE_MISC) {
-        printf("This operating system uses .dbg instead of .pdb\n");
-        return;
-    } else
     if(debug_directory.type != IMAGE_DEBUG_TYPE_CODEVIEW) {
-        printf("The header is not in CodeView format, unable to deal with that!\n");
-        return;
+        //printf("The header is not in CodeView format, it is in %u, unable to deal with that!\n", debug_directory.type);
+        return ret;
     }
 
-    struct cv_info_pdb70 *pdb_header = malloc(debug_directory.size_of_data);
-    vmi_read_pa(vmi, kernel_base_p + debug_directory.address_of_raw_data, pdb_header, debug_directory.size_of_data);
+    struct cv_info_nb10  *pdb_nb10_header = NULL;
+    struct cv_info_pdb70 *pdb_rsds_header = (struct cv_info_pdb70 *)malloc(debug_directory.size_of_data);
+    vmi_read_va(vmi, base_vaddr + debug_directory.address_of_raw_data, pid, pdb_rsds_header, debug_directory.size_of_data);
 
-    // The PDB header has to be PDB 7.0
-    // http://www.debuginfo.com/articles/debuginfomatch.html
-    if(pdb_header->cv_signature != RSDS) {
-       printf("The CodeView debug information has to be in PDB 7.0 for the kernel!\n");
-       return;
-    }
+    char * filename = NULL;
 
-     printf("\tPDB GUID: ");
-     printf("%.8x", pdb_header->signature.data1);
-     printf("%.4x", pdb_header->signature.data2);
-     printf("%.4x", pdb_header->signature.data3);
-
-     int c;
-     for(c=0;c<8;c++) printf("%.2x", pdb_header->signature.data4[c]);
-
-     printf("%.1x", pdb_header->age & 0xf);
-     printf("\n");
-     printf("\tKernel filename: %s\n", pdb_header->pdb_file_name);
-
-     if(!strcmp("ntoskrnl.pdb", pdb_header->pdb_file_name)) {
-        printf("\tSingle-processor without PAE\n");
-     } else
-     if(!strcmp("ntkrnlmp.pdb", pdb_header->pdb_file_name)) {
-        printf("\tMulti-processor without PAE\n");
-     } else
-     if(!strcmp("ntkrnlpa.pdb", pdb_header->pdb_file_name)) {
-        printf("\tSingle-processor with PAE (version 5.0 and higher)\n");
-     } else
-     if(!strcmp("ntkrpamp.pdb", pdb_header->pdb_file_name)) {
-        printf("\tMulti-processor with PAE (version 5.0 and higher)\n");
-     }
-
-     free(pdb_header);
-}*/
-
-void get_guid(vmi_instance_t vmi, addr_t vaddr, vmi_pid_t pid, char **pe_guid, char **pdb_guid) {
-
-    uint32_t size_of_image = 0;
-
-    struct pe_header *pe_header = NULL;
-    uint16_t optional_header_type = 0;
-    struct optional_header_pe32 *oh32 = NULL;
-    struct optional_header_pe32plus *oh32plus = NULL;
-
-    uint8_t pe[MAX_HEADER_SIZE];
-    vmi_read_va(vmi, vaddr, pid, pe, MAX_HEADER_SIZE);
-
-    peparse_assign_headers(pe, NULL, &pe_header, &optional_header_type, NULL, &oh32, &oh32plus);
-    addr_t debug_offset = peparse_get_idd_rva(IMAGE_DIRECTORY_ENTRY_DEBUG, NULL, NULL, oh32, oh32plus);
-
-    if(optional_header_type == IMAGE_PE32_MAGIC) {
-        size_of_image=oh32->size_of_image;
-    } else
-    if(optional_header_type == IMAGE_PE32_PLUS_MAGIC) {
-        size_of_image=oh32plus->size_of_image;
-    }
-
-    struct image_debug_directory debug_directory;
-    vmi_read_va(vmi, vaddr + debug_offset, pid, (uint8_t *)&debug_directory, sizeof(struct image_debug_directory));
-
-    *pe_guid = g_malloc0(snprintf(NULL, 0, "%.8x%.5x", pe_header->time_date_stamp,size_of_image) + 1);
-    sprintf(*pe_guid, "%.8x%.5x", pe_header->time_date_stamp,size_of_image);
-
-    if(debug_directory.type == IMAGE_DEBUG_TYPE_MISC) {
-        printf("This operating system uses .dbg instead of .pdb\n");
-        return;
-    } else
-    if(debug_directory.type != IMAGE_DEBUG_TYPE_CODEVIEW) {
-        printf("The header is not in CodeView format, unable to deal with that!\n");
-        return;
-    }
-
-    struct cv_info_pdb70 *pdb_header = malloc(debug_directory.size_of_data);
-    vmi_read_va(vmi, vaddr + debug_directory.address_of_raw_data, pid, pdb_header, debug_directory.size_of_data);
-
-    // The PDB header has to be PDB 7.0
-    // http://www.debuginfo.com/articles/debuginfomatch.html
-    if(pdb_header->cv_signature != RSDS) {
-       printf("The CodeView debug information has to be in PDB 7.0 for the kernel!\n");
-       return;
-    }
-
-    char *format = "%.8x%.4x%.4x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.1x";
-    *pdb_guid = g_malloc0(snprintf(NULL, 0, format,
-            pdb_header->signature.data1,
-            pdb_header->signature.data2,
-            pdb_header->signature.data3,
-            pdb_header->signature.data4[0],
-            pdb_header->signature.data4[1],
-            pdb_header->signature.data4[2],
-            pdb_header->signature.data4[3],
-            pdb_header->signature.data4[4],
-            pdb_header->signature.data4[5],
-            pdb_header->signature.data4[6],
-            pdb_header->signature.data4[7],
-            pdb_header->age & 0xf
-        ) + 1);
-
-    sprintf(*pdb_guid, format,
-            pdb_header->signature.data1,
-            pdb_header->signature.data2,
-            pdb_header->signature.data3,
-            pdb_header->signature.data4[0],
-            pdb_header->signature.data4[1],
-            pdb_header->signature.data4[2],
-            pdb_header->signature.data4[3],
-            pdb_header->signature.data4[4],
-            pdb_header->signature.data4[5],
-            pdb_header->signature.data4[6],
-            pdb_header->signature.data4[7],
-            pdb_header->age & 0xf
-        );
-}
-
-void print_pe_header(vmi_instance_t vmi, addr_t image_base_p, uint8_t *pe) {
-
-    struct pe_header *pe_header = NULL;
-    struct dos_header *dos_header = NULL;
-    uint16_t optional_header_type = 0;
-    peparse_assign_headers(pe, &dos_header, &pe_header, &optional_header_type, NULL, NULL, NULL);
-
-    printf("\tSignature: %u.\n", pe_header->signature);
-    printf("\tMachine: %u.\n", pe_header->machine);
-    printf("\t# of sections: %u.\n", pe_header->number_of_sections);
-    printf("\t# of symbols: %u.\n", pe_header->number_of_symbols);
-    printf("\tTimestamp: %u.\n", pe_header->time_date_stamp);
-    printf("\tCharacteristics: %u.\n", pe_header->characteristics);
-    printf("\tOptional header size: %u.\n", pe_header->size_of_optional_header);
-    printf("\tOptional header type: 0x%x\n", optional_header_type);
-
-    uint32_t c;
-    for(c=0; c < pe_header->number_of_sections; c++) {
-
-        struct section_header section;
-        addr_t section_addr = image_base_p
-            + dos_header->offset_to_pe
-            + sizeof(struct pe_header)
-            + pe_header->size_of_optional_header
-            + c*sizeof(struct section_header);
-
-        // Read the section from memory
-        vmi_read_pa(vmi, section_addr, (uint8_t *)&section, sizeof(struct section_header));
-
-        // The character array is not null terminated, so only print the first 8 characters!
-        printf("\tSection %u: %.8s\n", c+1, section.short_name);
-    }
-}
-
-/*int main(int argc, char **argv) {
-
-    vmi_instance_t vmi;
-
-    if (argc != 3) {
-        printf("Usage: %s name|domid <domain name|domain id>\n", argv[0]);
-        return 1;
-    }   // if
-
-    uint32_t domid = VMI_INVALID_DOMID;
-    GHashTable *config = g_hash_table_new(g_str_hash, g_str_equal);
-
-    if(strcmp(argv[1],"name")==0) {
-        g_hash_table_insert(config, "name", argv[2]);
-    } else
-    if(strcmp(argv[1],"domid")==0) {
-        domid = atoi(argv[2]);
-        g_hash_table_insert(config, "domid", &domid);
-    } else {
-        printf("You have to specify either name or domid!\n");
-        return 1;
-    }
-
-    if (vmi_init_custom(&vmi, VMI_AUTO | VMI_INIT_PARTIAL | VMI_CONFIG_GHASHTABLE, config) == VMI_FAILURE) {
-        printf("Failed to init LibVMI library.\n");
-        g_hash_table_destroy(config);
-        return 1;
-    }
-    g_hash_table_destroy(config);
-
-    uint32_t i;
-    uint32_t found = 0;
-    for(i = 0; i < MAX_SEARCH_SIZE; i += PAGE_SIZE) {
-
-        uint8_t pe[MAX_HEADER_SIZE];
-
-        if(VMI_SUCCESS == peparse_get_image_phys(vmi, i, MAX_HEADER_SIZE, pe)) {
-            if(VMI_SUCCESS == is_WINDOWS_KERNEL(vmi, i, pe)) {
-
-                printf("Windows Kernel found @ 0x%"PRIx32"\n", i);
-                print_os_version(vmi, i, pe);
-                print_guid(vmi, i, pe);
-                print_pe_header(vmi, i, pe);
-                found=1;
-                break;
-            }
+    if(pdb_rsds_header->cv_signature != RSDS) {
+        if(pdb_rsds_header->cv_signature != NB10) {
+            //printf("The CodeView debug information has to be in PDB 7.0 (RSDS) or NB10 format!\n");
+            return ret;
         }
+
+        pdb_nb10_header = (struct cv_info_nb10 *)pdb_rsds_header;
+
+        *pdb_guid=(char*)g_malloc0(snprintf(NULL, 0, "%x%x", pdb_nb10_header->timestamp, pdb_nb10_header->age)+1);
+        sprintf(*pdb_guid, "%x%x", pdb_nb10_header->timestamp, pdb_nb10_header->age);
+        filename=(char*)strdup((char *)pdb_nb10_header->pdb_file_name);
+
+    } else {
+        *pdb_guid=(char*)g_malloc0(snprintf(NULL, 0,
+            "%.8x%.4x%.4x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.1x",
+            pdb_rsds_header->signature.data1, pdb_rsds_header->signature.data2, pdb_rsds_header->signature.data3,
+            pdb_rsds_header->signature.data4[0], pdb_rsds_header->signature.data4[1], pdb_rsds_header->signature.data4[2],
+            pdb_rsds_header->signature.data4[3], pdb_rsds_header->signature.data4[4], pdb_rsds_header->signature.data4[5],
+            pdb_rsds_header->signature.data4[6], pdb_rsds_header->signature.data4[7],
+            pdb_rsds_header->age & 0xf
+            )+1);
+
+        sprintf(*pdb_guid, "%.8x%.4x%.4x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.2x%.1x",
+            pdb_rsds_header->signature.data1, pdb_rsds_header->signature.data2, pdb_rsds_header->signature.data3,
+            pdb_rsds_header->signature.data4[0], pdb_rsds_header->signature.data4[1], pdb_rsds_header->signature.data4[2],
+            pdb_rsds_header->signature.data4[3], pdb_rsds_header->signature.data4[4], pdb_rsds_header->signature.data4[5],
+            pdb_rsds_header->signature.data4[6], pdb_rsds_header->signature.data4[7],
+            pdb_rsds_header->age & 0xf);
+
+        filename=(char*)strdup((char *)pdb_rsds_header->pdb_file_name);
     }
 
-    vmi_destroy(vmi);
+    //printf("%s:%s:%s\n", filename, *pe_guid, *pdb_guid);
 
-    if(found) return 0;
-    return 1;
-}*/
+    ret=VMI_SUCCESS;
+
+    free(pdb_rsds_header);
+    free(filename);
+
+    return ret;
+}
+

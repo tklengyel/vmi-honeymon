@@ -221,6 +221,6 @@ fi
 #	[AC_DEFINE(HAVE_SQLITE3, 1, "Working SQlite3 library found")], 
 #	[AC_MSG_NOTICE([*** No working SQlite3 library found, disabling SQlite3 logging!])])
 
-AC_CONFIG_FILES([Makefile src/Makefile tools/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile tools/magic-test/Makefile])
 AC_OUTPUT
 

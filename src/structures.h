@@ -209,9 +209,16 @@ typedef struct honeypot {
     GSList* fschecksum; // each node is a GTree with the file path as key and hash as value
 } honeymon_honeypot_t;
 
+// forward declare
+struct config;
+
 struct symbol {
     char *name;
-    uint64_t rva;
+    addr_t rva;
+
+    addr_t pa;
+    uint8_t backup;
+    struct config *conf;
 };
 
 struct config {
@@ -221,9 +228,10 @@ struct config {
     uint64_t *sym_count;
 };
 
-struct sym_lookup {
+struct guid_lookup {
     struct config *conf;
     GTree *rva_lookup;
+    uint8_t free;
 };
 
 typedef struct clone {
@@ -264,7 +272,9 @@ typedef struct clone {
     int interrupted;
     page_mode_t pm;
     vmi_instance_t vmi;
-    GTree *sym_lookup; // key: both PE and PDB GUIDs
+    GTree *guid_lookup; // key: both PE and PDB GUIDs
+    GTree *pa_lookup; // key: PA of trap
+    addr_t trap_reset;
 
     // memory benchmark
     bool membench;
@@ -275,5 +285,4 @@ typedef struct clone {
 guestfs_h* guestfs;
 #endif
 } honeymon_clone_t;
-
 #endif
