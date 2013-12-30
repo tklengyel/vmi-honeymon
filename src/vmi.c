@@ -37,7 +37,6 @@
 #include <libvmi/peparse.h>
 
 #include "structures.h"
-#include "log.h"
 #include "win-guid.h"
 #include "vmi.h"
 
@@ -101,6 +100,104 @@ gint intcmp(gconstpointer v1, gconstpointer v2,
             (*(uint64_t *) v1 == (*(uint64_t *) v2)) ? 0 : -1);
 }
 
+void print_registers(vmi_instance_t vmi, unsigned long vcpu) {
+    registers_t i=0;
+    for(;i<TSC;i++) {
+        reg_t reg=0;
+        vmi_get_vcpureg(vmi, &reg, i, vcpu);
+        printf("REG %i: 0x%lx\n", i, reg);
+    }
+}
+
+// This is the callback when an int3 or a read event happens
+void reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
+    //add trap back
+    uint8_t trap = TRAP;
+    honeymon_clone_t *clone = event->data;
+    vmi_write_8_pa(vmi, clone->trap_reset, &trap);
+    clone->trap_reset = 0;
+}
+
+// This is the callback when an write event happens
+void save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
+    uint8_t trap = TRAP;
+    honeymon_clone_t *clone = event->data;
+    struct symbol *s = g_tree_lookup(clone->pa_lookup, &clone->trap_reset);
+    //save the write
+    vmi_read_8_pa(vmi, clone->trap_reset, &s->backup);
+    //add trap back
+    vmi_write_8_pa(vmi, clone->trap_reset, &trap);
+    clone->trap_reset = 0;
+}
+
+void mem_event_cb(vmi_instance_t vmi, vmi_event_t *event){
+
+    honeymon_clone_t *clone = event->data;
+    addr_t pa = (event->mem_event.gfn << 12) + event->mem_event.offset;
+
+    struct symbol *s = g_tree_lookup(clone->pa_lookup, &pa);
+
+    vmi_clear_event(vmi, event);
+
+    if(s) {
+        /*printf("PA %"PRIx64" ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"PRIx64") gla %016"PRIx64" (vcpu %u)\n",
+            pa,
+            (event->mem_event.out_access & VMI_MEMACCESS_R) ? 'r' : '-',
+            (event->mem_event.out_access & VMI_MEMACCESS_W) ? 'w' : '-',
+            (event->mem_event.out_access & VMI_MEMACCESS_X) ? 'x' : '-',
+            event->mem_event.gfn,
+            event->mem_event.offset,
+            event->mem_event.gla,
+            event->vcpu_id);*/
+
+        if(event->mem_event.out_access & VMI_MEMACCESS_R) {
+            printf("Read memaccess @ Symbol: %s!%s\n", s->conf->name, s->name);
+            vmi_write_8_pa(vmi, pa, &s->backup);
+            clone->trap_reset = pa;
+            vmi_step_event(vmi, event, event->vcpu_id, 1, reset_trap);
+        }
+        if(event->mem_event.out_access & VMI_MEMACCESS_W) {
+            printf("Write memaccess @ Symbol: %s!%s\n", s->conf->name, s->name);
+            clone->trap_reset = pa;
+            vmi_step_event(vmi, event, event->vcpu_id, 1, save_and_reset_trap);
+        }
+    } else {
+        vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
+    }
+
+    return;
+}
+
+void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
+
+    reg_t cr3;
+    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
+    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
+    honeymon_clone_t *clone = event->data;
+    addr_t pa = (event->interrupt_event.gfn<<12) + event->interrupt_event.offset;
+    struct symbol *s = g_tree_lookup(clone->pa_lookup, &pa);
+
+    //print_registers(vmi, event->vcpu_id);
+
+    if(s) {
+        printf("PID: %"PRIi32" PA=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
+          pid, pa, event->interrupt_event.gla, s->conf->name, s->name);
+
+        // remove trap
+        vmi_write_8_pa(vmi, pa, &s->backup);
+
+        vmi_clear_event(vmi, event);
+        event->interrupt_event.enabled = 1;
+        event->interrupt_event.reinject = 0;
+        clone->trap_reset = pa;
+        vmi_step_event(vmi, event, event->vcpu_id, 1, reset_trap);
+    } else {
+        printf("Unknown Int3 event: PID: %"PRIi32" GFN=%"PRIx64" RIP=%"PRIx64"\n",
+            pid, event->interrupt_event.gfn, event->interrupt_event.gla);
+        event->interrupt_event.reinject = 1;
+    }
+}
+
 void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
 
     vmi_instance_t vmi = clone->vmi;
@@ -108,6 +205,8 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
 
         char *pe_guid = NULL, *pdb_guid = NULL;
         get_guid(vmi, vaddr, pid, &pe_guid, &pdb_guid);
+
+        printf("\t\tPE: %s PDB: %s\n", pe_guid, pdb_guid);
 
         struct guid_lookup *s = NULL;
         if(pdb_guid) {
@@ -121,29 +220,42 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
             uint64_t trapped = 0;
             for(; i < *(s->conf->sym_count); i++) {
 
-                // if the physical address was already trapped we skip it
-                if(s->conf->syms[i].pa) {
+                // get pa
+                addr_t pa =0;
+                if(!pid) {
+                    pa = vmi_translate_kv2p(vmi, vaddr + s->conf->syms[i].rva);
+                } else {
+                    pa = vmi_translate_uv2p(vmi, vaddr + s->conf->syms[i].rva, pid);
+                }
+
+                // check if pa is valid and if already marked
+                if(!pa || g_tree_lookup(clone->pa_lookup, &pa)) {
                     continue;
                 }
 
-                // save current pa
-                if(!pid) {
-                    s->conf->syms[i].pa = vmi_translate_kv2p(vmi, vaddr + s->conf->syms[i].rva);
-                } else {
-                    s->conf->syms[i].pa = vmi_translate_uv2p(vmi, vaddr + s->conf->syms[i].rva, pid);
-                }
+                // backup current byte
+                vmi_read_8_pa(vmi, pa, &s->conf->syms[i].backup);
 
-                //backup current byte
-                vmi_read_8_va(vmi, vaddr + s->conf->syms[i].rva, pid, &s->conf->syms[i].backup);
+                // write trap
+                vmi_write_8_pa(vmi, pa, &trap);
 
-                //add trap
-                vmi_write_8_va(vmi, vaddr + s->conf->syms[i].rva, pid, &trap);
+                // set the pa on this symbol
+                s->conf->syms[i].pa = pa;
 
-                //save trap location into lookup tree
+                // save trap location into lookup tree
                 g_tree_insert(clone->pa_lookup, &s->conf->syms[i].pa, &s->conf->syms[i]);
 
+                if(NULL == vmi_get_mem_event(vmi, pa, VMI_MEMEVENT_PAGE)) {
+                    vmi_event_t *mem_event = g_malloc0(sizeof(vmi_event_t));
+                    SETUP_MEM_EVENT(mem_event, pa, VMI_MEMEVENT_PAGE, VMI_MEMACCESS_RW, mem_event_cb);
+                    mem_event->data = clone;
+                    if(VMI_FAILURE == vmi_register_event(vmi, mem_event)) {
+                        free(mem_event);
+                    }
+                }
+
                 trapped++;
-                printf("\t\tTrap added @ VA 0x%lx PA 0x%lx for %s!%s\n", vaddr + s->conf->syms[i].rva, s->conf->syms[i].pa, s->conf->name, s->conf->syms[i].name);
+                //printf("\t\tTrap added @ VA 0x%lx PA 0x%lx for %s!%s. Backup: 0x%x\n", vaddr + s->conf->syms[i].rva, s->conf->syms[i].pa, s->conf->name, s->conf->syms[i].name, s->conf->syms[i].backup);
             }
 
             printf("\tInjected %lu traps into PE with GUID %s:%s\n", trapped, pe_guid, pdb_guid);
@@ -231,8 +343,10 @@ void inject_traps(honeymon_clone_t *clone) {
         vmi_read_addr_va(vmi, peb+offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][PEB_LDR], pid, &ldr);
         vmi_read_addr_va(vmi, ldr+offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][PEB_LDR_DATA_INLOADORDERMODULELIST], pid, &modlist);
 
-        inject_traps_pe(clone, imagebase, pid);
-        inject_traps_modules(clone, modlist, pid);
+        if(pid != 4) {
+            inject_traps_pe(clone, imagebase, pid);
+            inject_traps_modules(clone, modlist, pid);
+        }
 
         current_list_entry = next_list_entry;
         current_process = current_list_entry - offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][EPROCESS_TASKS];
@@ -249,41 +363,9 @@ void inject_traps(honeymon_clone_t *clone) {
 
 }
 
-void int3_cb2(vmi_instance_t vmi, vmi_event_t *event) {
-    //add trap back
-    uint8_t trap = TRAP;
-    honeymon_clone_t *clone = event->data;
-    printf("Int3cb2, putting trap back @ PA 0x%lx!\n", clone->trap_reset);
-    vmi_write_8_pa(vmi, clone->trap_reset, &trap);
-    clone->trap_reset = 0;
-}
-
-void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
-
-    reg_t cr3;
-    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
-    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
-    honeymon_clone_t *clone = event->data;
-    addr_t pa = (event->interrupt_event.gfn<<12) + event->interrupt_event.offset;
-    struct symbol *s = g_tree_lookup(clone->pa_lookup, &pa);
-
-    addr_t test = vmi_translate_uv2p(vmi, event->interrupt_event.gla, pid);
-
-    if(s) {
-        printf("Int 3 happened: PID: %"PRIi32" PA=%"PRIx64" TEST=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
-          pid, pa, test, event->interrupt_event.gla, s->conf->name, s->name);
-
-        // remove trap
-        clone->trap_reset = pa;
-        vmi_write_8_pa(vmi, pa, &s->backup);
-        vmi_step_event(vmi, event, event->vcpu_id, 1, int3_cb2);
-    } else {
-        printf("Unknown Int3 event: PID: %"PRIi32" GFN=%"PRIx64" RIP=%"PRIx64"\n",
-            pid, event->interrupt_event.gfn, event->interrupt_event.gla);
-    }
-}
-
 void *clone_vmi_thread(void *input) {
+
+    printf("Started vmi clone thread\n");
 
     honeymon_clone_t *clone = (honeymon_clone_t *)input;
     vmi_event_t interrupt_event;
@@ -295,6 +377,8 @@ void *clone_vmi_thread(void *input) {
     interrupt_event.data = clone;
 
     vmi_register_event(clone->vmi, &interrupt_event);
+
+    vmi_resume_vm(clone->vmi);
 
     while (!clone->interrupted) {
         //printf("Waiting for events...\n");
@@ -319,6 +403,7 @@ void clone_vmi_init(honeymon_clone_t *clone) {
 
     /* partialy initialize the libvmi library */
     if (vmi_init_custom(&clone->vmi, VMI_XEN | VMI_INIT_PARTIAL | VMI_CONFIG_GHASHTABLE, (vmi_config_t)config) == VMI_FAILURE) {
+        clone->vmi = NULL;
         return;
     }
 
@@ -337,6 +422,7 @@ void clone_vmi_init(honeymon_clone_t *clone) {
         if (clone->vmi != NULL ) {
             vmi_destroy(clone->vmi);
         }
+        clone->vmi = NULL;
         return;
     }
     g_hash_table_destroy(config);
@@ -369,15 +455,6 @@ void clone_vmi_init(honeymon_clone_t *clone) {
 
 // -------------------------- closing
 
-
-void close_vmi_clone(honeymon_clone_t *clone) {
-    g_tree_destroy(clone->guid_lookup);
-    g_tree_destroy(clone->pa_lookup);
-    if(clone->vmi) {
-        vmi_destroy(clone->vmi);
-    }
-}
-
 void free_guid_lookup(gpointer z) {
     struct guid_lookup *s = (struct guid_lookup *)z;
     if(!s->free) {
@@ -386,5 +463,13 @@ void free_guid_lookup(gpointer z) {
         g_tree_destroy(s->rva_lookup);
         free(s);
         s=NULL;
+    }
+}
+
+void close_vmi_clone(honeymon_clone_t *clone) {
+    g_tree_destroy(clone->guid_lookup);
+    g_tree_destroy(clone->pa_lookup);
+    if(clone->vmi) {
+        vmi_destroy(clone->vmi);
     }
 }

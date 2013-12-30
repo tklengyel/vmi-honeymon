@@ -2,7 +2,7 @@
 #define WIN7_SP1_X64_H
 #include "win7_sp1_x64/wbemcntl.h"
 #include "win7_sp1_x64/cryptui.h"
-#include "win7_sp1_x64/fltMgr.h"
+//#include "win7_sp1_x64/fltMgr.h"
 #include "win7_sp1_x64/shacct.h"
 #include "win7_sp1_x64/unidrv.h"
 #include "win7_sp1_x64/AUDIOENG.h"
@@ -15,7 +15,7 @@
 #include "win7_sp1_x64/SQLSRV32.h"
 #include "win7_sp1_x64/tsgQec.h"
 #include "win7_sp1_x64/radardt.h"
-#include "win7_sp1_x64/pacer.h"
+//#include "win7_sp1_x64/pacer.h"
 #include "win7_sp1_x64/FunDisc.h"
 #include "win7_sp1_x64/winhttp.h"
 #include "win7_sp1_x64/WMVSENCD.h"
@@ -35,7 +35,7 @@
 #include "win7_sp1_x64/wanarp.h"
 #include "win7_sp1_x64/RpcRtRemote.h"
 #include "win7_sp1_x64/msimg32.h"
-#include "win7_sp1_x64/i8042prt.h"
+//#include "win7_sp1_x64/i8042prt.h"
 #include "win7_sp1_x64/SearchProtocolHost.h"
 #include "win7_sp1_x64/newdev.h"
 #include "win7_sp1_x64/PlaySndSrv.h"
@@ -66,7 +66,7 @@
 #include "win7_sp1_x64/makecab.h"
 #include "win7_sp1_x64/PortableDeviceApi.h"
 #include "win7_sp1_x64/ntkrpamp.h"
-#include "win7_sp1_x64/tdx.h"
+//#include "win7_sp1_x64/tdx.h"
 #include "win7_sp1_x64/SearchFolder.h"
 #include "win7_sp1_x64/catsrv.h"
 #include "win7_sp1_x64/devobj.h"
@@ -166,11 +166,11 @@
 #include "win7_sp1_x64/ipsecsvc.h"
 #include "win7_sp1_x64/mprapi.h"
 #include "win7_sp1_x64/UxTheme.h"
-static uint64_t win7_sp1_x64_config_count = 166;
+static uint64_t win7_sp1_x64_config_count = 162;
 static struct config win7_sp1_x64_configs[] = {
 	{.name="win7_sp1_x64_wbemcntl", .guids=win7_sp1_x64_wbemcntl_guid, .syms=win7_sp1_x64_wbemcntl, .sym_count=&win7_sp1_x64_wbemcntl_count},
 	{.name="win7_sp1_x64_cryptui", .guids=win7_sp1_x64_cryptui_guid, .syms=win7_sp1_x64_cryptui, .sym_count=&win7_sp1_x64_cryptui_count},
-	{.name="win7_sp1_x64_fltMgr", .guids=win7_sp1_x64_fltMgr_guid, .syms=win7_sp1_x64_fltMgr, .sym_count=&win7_sp1_x64_fltMgr_count},
+//	{.name="win7_sp1_x64_fltMgr", .guids=win7_sp1_x64_fltMgr_guid, .syms=win7_sp1_x64_fltMgr, .sym_count=&win7_sp1_x64_fltMgr_count},
 	{.name="win7_sp1_x64_shacct", .guids=win7_sp1_x64_shacct_guid, .syms=win7_sp1_x64_shacct, .sym_count=&win7_sp1_x64_shacct_count},
 	{.name="win7_sp1_x64_unidrv", .guids=win7_sp1_x64_unidrv_guid, .syms=win7_sp1_x64_unidrv, .sym_count=&win7_sp1_x64_unidrv_count},
 	{.name="win7_sp1_x64_AUDIOENG", .guids=win7_sp1_x64_AUDIOENG_guid, .syms=win7_sp1_x64_AUDIOENG, .sym_count=&win7_sp1_x64_AUDIOENG_count},
@@ -183,7 +183,7 @@ static struct config win7_sp1_x64_configs[] = {
 	{.name="win7_sp1_x64_SQLSRV32", .guids=win7_sp1_x64_SQLSRV32_guid, .syms=win7_sp1_x64_SQLSRV32, .sym_count=&win7_sp1_x64_SQLSRV32_count},
 	{.name="win7_sp1_x64_tsgQec", .guids=win7_sp1_x64_tsgQec_guid, .syms=win7_sp1_x64_tsgQec, .sym_count=&win7_sp1_x64_tsgQec_count},
 	{.name="win7_sp1_x64_radardt", .guids=win7_sp1_x64_radardt_guid, .syms=win7_sp1_x64_radardt, .sym_count=&win7_sp1_x64_radardt_count},
-	{.name="win7_sp1_x64_pacer", .guids=win7_sp1_x64_pacer_guid, .syms=win7_sp1_x64_pacer, .sym_count=&win7_sp1_x64_pacer_count},
+//	{.name="win7_sp1_x64_pacer", .guids=win7_sp1_x64_pacer_guid, .syms=win7_sp1_x64_pacer, .sym_count=&win7_sp1_x64_pacer_count},
 	{.name="win7_sp1_x64_FunDisc", .guids=win7_sp1_x64_FunDisc_guid, .syms=win7_sp1_x64_FunDisc, .sym_count=&win7_sp1_x64_FunDisc_count},
 	{.name="win7_sp1_x64_winhttp", .guids=win7_sp1_x64_winhttp_guid, .syms=win7_sp1_x64_winhttp, .sym_count=&win7_sp1_x64_winhttp_count},
 	{.name="win7_sp1_x64_WMVSENCD", .guids=win7_sp1_x64_WMVSENCD_guid, .syms=win7_sp1_x64_WMVSENCD, .sym_count=&win7_sp1_x64_WMVSENCD_count},
@@ -203,7 +203,7 @@ static struct config win7_sp1_x64_configs[] = {
 	{.name="win7_sp1_x64_wanarp", .guids=win7_sp1_x64_wanarp_guid, .syms=win7_sp1_x64_wanarp, .sym_count=&win7_sp1_x64_wanarp_count},
 	{.name="win7_sp1_x64_RpcRtRemote", .guids=win7_sp1_x64_RpcRtRemote_guid, .syms=win7_sp1_x64_RpcRtRemote, .sym_count=&win7_sp1_x64_RpcRtRemote_count},
 	{.name="win7_sp1_x64_msimg32", .guids=win7_sp1_x64_msimg32_guid, .syms=win7_sp1_x64_msimg32, .sym_count=&win7_sp1_x64_msimg32_count},
-	{.name="win7_sp1_x64_i8042prt", .guids=win7_sp1_x64_i8042prt_guid, .syms=win7_sp1_x64_i8042prt, .sym_count=&win7_sp1_x64_i8042prt_count},
+//	{.name="win7_sp1_x64_i8042prt", .guids=win7_sp1_x64_i8042prt_guid, .syms=win7_sp1_x64_i8042prt, .sym_count=&win7_sp1_x64_i8042prt_count},
 	{.name="win7_sp1_x64_SearchProtocolHost", .guids=win7_sp1_x64_SearchProtocolHost_guid, .syms=win7_sp1_x64_SearchProtocolHost, .sym_count=&win7_sp1_x64_SearchProtocolHost_count},
 	{.name="win7_sp1_x64_newdev", .guids=win7_sp1_x64_newdev_guid, .syms=win7_sp1_x64_newdev, .sym_count=&win7_sp1_x64_newdev_count},
 	{.name="win7_sp1_x64_PlaySndSrv", .guids=win7_sp1_x64_PlaySndSrv_guid, .syms=win7_sp1_x64_PlaySndSrv, .sym_count=&win7_sp1_x64_PlaySndSrv_count},
@@ -234,7 +234,7 @@ static struct config win7_sp1_x64_configs[] = {
 	{.name="win7_sp1_x64_makecab", .guids=win7_sp1_x64_makecab_guid, .syms=win7_sp1_x64_makecab, .sym_count=&win7_sp1_x64_makecab_count},
 	{.name="win7_sp1_x64_PortableDeviceApi", .guids=win7_sp1_x64_PortableDeviceApi_guid, .syms=win7_sp1_x64_PortableDeviceApi, .sym_count=&win7_sp1_x64_PortableDeviceApi_count},
 	{.name="win7_sp1_x64_ntkrpamp", .guids=win7_sp1_x64_ntkrpamp_guid, .syms=win7_sp1_x64_ntkrpamp, .sym_count=&win7_sp1_x64_ntkrpamp_count},
-	{.name="win7_sp1_x64_tdx", .guids=win7_sp1_x64_tdx_guid, .syms=win7_sp1_x64_tdx, .sym_count=&win7_sp1_x64_tdx_count},
+//	{.name="win7_sp1_x64_tdx", .guids=win7_sp1_x64_tdx_guid, .syms=win7_sp1_x64_tdx, .sym_count=&win7_sp1_x64_tdx_count},
 	{.name="win7_sp1_x64_SearchFolder", .guids=win7_sp1_x64_SearchFolder_guid, .syms=win7_sp1_x64_SearchFolder, .sym_count=&win7_sp1_x64_SearchFolder_count},
 	{.name="win7_sp1_x64_catsrv", .guids=win7_sp1_x64_catsrv_guid, .syms=win7_sp1_x64_catsrv, .sym_count=&win7_sp1_x64_catsrv_count},
 	{.name="win7_sp1_x64_devobj", .guids=win7_sp1_x64_devobj_guid, .syms=win7_sp1_x64_devobj, .sym_count=&win7_sp1_x64_devobj_count},

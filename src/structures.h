@@ -234,6 +234,13 @@ struct guid_lookup {
     uint8_t free;
 };
 
+struct page_lookup {
+    vmi_instance_t vmi;
+    vmi_event_t event;
+    addr_t page;
+    uint64_t counter;
+};
+
 typedef struct clone {
     honeymon_t* honeymon;
     honeymon_honeypot_t* origin;
@@ -274,6 +281,7 @@ typedef struct clone {
     vmi_instance_t vmi;
     GTree *guid_lookup; // key: both PE and PDB GUIDs
     GTree *pa_lookup; // key: PA of trap
+    GTree *page_lookup; // key: page of trap
     addr_t trap_reset;
 
     // memory benchmark
@@ -285,4 +293,6 @@ typedef struct clone {
 guestfs_h* guestfs;
 #endif
 } honeymon_clone_t;
+
+
 #endif

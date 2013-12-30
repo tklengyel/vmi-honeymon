@@ -13,6 +13,9 @@ def main(folder):
             count = count + 1
             print "#include \"%s/%s\"" % (path, fn)
 
+        if count > 0:
+            count = count - 1
+
         print "static uint64_t %s_config_count = %u;" % (path,count)
         print "static struct config %s_configs[] = {" % path
 
