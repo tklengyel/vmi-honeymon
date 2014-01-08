@@ -70,15 +70,9 @@ void honeymon_input_parse(honeymon_t* honeymon, int argc, char **argv) {
                 honeymon->action = 4;
                 honeymon->action_option = strdup(argv[x + 1]);
                 x += 2;
-            } else if (!strcmp(argv[x], "--start-tcp")) {
-                honeymon->action = 5;
-                x++;
             } else if (!strcmp(argv[x], "--stealthy")
                     || !strcmp(argv[x], "--unpaused-scans")) {
                 honeymon->stealthy = 1;
-                x++;
-            } else if (!strcmp(argv[x], "--enable-guestfs")) {
-                honeymon->guestfs_enable = 1;
                 x++;
             } else if (!strcmp(argv[x], "-test") && x + 1 < argc) {
                 honeymon->interactive = 0;

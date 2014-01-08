@@ -15,4 +15,4 @@ Mount the disk of the Windows VM in /mnt
 
 4)
 Create config header:
-    ./createConfig win7_sp1_x64 > win7_sp1_x64_config.h
+    ./createConfig.py win7_sp1_x64 > win7_sp1_x64_config.h

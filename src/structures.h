@@ -1,7 +1,7 @@
 /*
  * This file is part of the VMI-Honeymon project.
  *
- * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * 2012-2014 University of Connecticut (http://www.uconn.edu)
  * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
  *
  * VMI-Honeymon is free software; you can redistribute it and/or modify
@@ -144,9 +144,8 @@ typedef struct honeymon {
     GAsyncQueue *clone_requests;
     pthread_t clone_factory;
 
-    win_ver_t winver;
-
-    bool guestfs_enable;
+    GTree *pooltags;
+    GTree *guids;
 
 #ifdef HAVE_LIBMAGIC
 magic_t magic_cookie;
@@ -209,16 +208,9 @@ typedef struct honeypot {
     GSList* fschecksum; // each node is a GTree with the file path as key and hash as value
 } honeymon_honeypot_t;
 
-// forward declare
-struct config;
-
 struct symbol {
     char *name;
     addr_t rva;
-
-    addr_t pa;
-    uint8_t backup;
-    struct config *conf;
 };
 
 struct config {
@@ -228,17 +220,29 @@ struct config {
     uint64_t *sym_count;
 };
 
+struct symbolwrap {
+    struct config *config;
+    struct symbol *symbol;
+    addr_t pa;
+    uint8_t backup;
+    vmi_instance_t vmi;
+    vmi_event_t *guard;
+};
+
 struct guid_lookup {
     struct config *conf;
-    GTree *rva_lookup;
+    GHashTable *rva_lookup;
     uint8_t free;
 };
 
-struct page_lookup {
-    vmi_instance_t vmi;
-    vmi_event_t event;
-    addr_t page;
-    uint64_t counter;
+struct pool_lookup {
+    addr_t pa;
+    addr_t va;
+    vmi_pid_t pid;
+    size_t size;
+    uint16_t type;
+    uint8_t backup;
+    uint32_t count;
 };
 
 typedef struct clone {
@@ -280,19 +284,22 @@ typedef struct clone {
     page_mode_t pm;
     vmi_instance_t vmi;
     GTree *guid_lookup; // key: both PE and PDB GUIDs
-    GTree *pa_lookup; // key: PA of trap
-    GTree *page_lookup; // key: page of trap
+    GHashTable *pa_lookup; // key: PA of trap
+    GHashTable *pool_lookup; // key: PA of trap
+    GHashTable *file_watch;
     addr_t trap_reset;
 
-    // memory benchmark
-    bool membench;
-    pthread_t membench_thread;
+    GTree *files_accessed;
 
-// guestfs
-#ifdef HAVE_LIBGUESTFS
-guestfs_h* guestfs;
-#endif
 } honeymon_clone_t;
 
+struct file_watch {
+    vmi_instance_t vmi;
+    vmi_event_t *event;
+    honeymon_clone_t *clone;
+    addr_t pa;
+    addr_t file_name;
+    vmi_pid_t pid;
+};
 
 #endif

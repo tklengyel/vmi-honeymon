@@ -1,7 +1,7 @@
 /*
  * This file is part of the VMI-Honeymon project.
  *
- * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * 2012-2014 University of Connecticut (http://www.uconn.edu)
  * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
  *
  * VMI-Honeymon is free software; you can redistribute it and/or modify
@@ -37,80 +37,22 @@
 #include <libvmi/peparse.h>
 
 #include "structures.h"
+#include "log.h"
+
 #include "win-guid.h"
 #include "vmi.h"
 
-#include "win7_sp1_x64_config.h"
-
-#define BIT32 0
-#define BIT64 1
-#define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
-
-#define TRAP 0xCC
-
-enum offset_t {
-    EPROCESS_PID,
-    EPROCESS_PDBASE,
-    EPROCESS_PNAME,
-    EPROCESS_TASKS,
-    EPROCESS_PEB,
-
-    PEB_IMAGEBASADDRESS,
-    PEB_LDR,
-
-    PEB_LDR_DATA_INLOADORDERMODULELIST,
-
-    LDR_DATA_TABLE_ENTRY_DLLBASE,
-
-    OFFSET_MAX
-};
-
-static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
-    [VMI_OS_WINDOWS_XP] =  {
-        [BIT32] = {
-        },
-    },
-    [VMI_OS_WINDOWS_7] = {
-        [BIT32] = {
-            [EPROCESS_PID]                      = 0xb4,
-            [EPROCESS_PDBASE]                   = 0x18,
-            [EPROCESS_TASKS]                    = 0xb8,
-            [EPROCESS_PNAME]                    = 0x16c,
-        },
-        [BIT64] = {
-            [EPROCESS_PID]                      = 0x180,
-            [EPROCESS_PDBASE]                   = 0x28,
-            [EPROCESS_TASKS]                    = 0x188,
-            [EPROCESS_PNAME]                    = 0x2e0,
-            [EPROCESS_PEB]                      = 0x338,
-
-            [PEB_IMAGEBASADDRESS]               = 0x10,
-            [PEB_LDR]                           = 0x18,
-
-            [PEB_LDR_DATA_INLOADORDERMODULELIST]= 0x10,
-
-            [LDR_DATA_TABLE_ENTRY_DLLBASE]      = 0x30,
-        }
-    },
-};
-
-gint intcmp(gconstpointer v1, gconstpointer v2,
-        __attribute__((unused))      gconstpointer unused) {
-    return (*(uint64_t *) v1 < (*(uint64_t *) v2) ? 1 :
-            (*(uint64_t *) v1 == (*(uint64_t *) v2)) ? 0 : -1);
-}
-
-void print_registers(vmi_instance_t vmi, unsigned long vcpu) {
-    registers_t i=0;
-    for(;i<TSC;i++) {
-        reg_t reg=0;
-        vmi_get_vcpureg(vmi, &reg, i, vcpu);
-        printf("REG %i: 0x%lx\n", i, reg);
+void vmi_build_guid_tree(honeymon_t *honeymon) {
+    honeymon->guids = g_tree_new((GCompareFunc)strcmp);
+    uint32_t i;
+    for(i=0;i<win7_sp1_x64_config_count;i++) {
+        g_tree_insert(honeymon->guids, win7_sp1_x64_config[i].guids[0], &win7_sp1_x64_config[i]);
+        g_tree_insert(honeymon->guids, win7_sp1_x64_config[i].guids[1], &win7_sp1_x64_config[i]);
     }
 }
 
 // This is the callback when an int3 or a read event happens
-void reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
+void vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
     //add trap back
     uint8_t trap = TRAP;
     honeymon_clone_t *clone = event->data;
@@ -119,10 +61,10 @@ void reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
 }
 
 // This is the callback when an write event happens
-void save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
+void vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event) {
     uint8_t trap = TRAP;
     honeymon_clone_t *clone = event->data;
-    struct symbol *s = g_tree_lookup(clone->pa_lookup, &clone->trap_reset);
+    struct symbolwrap *s = g_hash_table_lookup(clone->pa_lookup, &clone->trap_reset);
     //save the write
     vmi_read_8_pa(vmi, clone->trap_reset, &s->backup);
     //add trap back
@@ -135,7 +77,7 @@ void mem_event_cb(vmi_instance_t vmi, vmi_event_t *event){
     honeymon_clone_t *clone = event->data;
     addr_t pa = (event->mem_event.gfn << 12) + event->mem_event.offset;
 
-    struct symbol *s = g_tree_lookup(clone->pa_lookup, &pa);
+    struct symbolwrap *s = g_hash_table_lookup(clone->pa_lookup, &pa);
 
     vmi_clear_event(vmi, event);
 
@@ -151,17 +93,18 @@ void mem_event_cb(vmi_instance_t vmi, vmi_event_t *event){
             event->vcpu_id);*/
 
         if(event->mem_event.out_access & VMI_MEMACCESS_R) {
-            printf("Read memaccess @ Symbol: %s!%s\n", s->conf->name, s->name);
+            printf("Read memaccess @ Symbol: %s!%s\n", s->config->name, s->symbol->name);
             vmi_write_8_pa(vmi, pa, &s->backup);
             clone->trap_reset = pa;
-            vmi_step_event(vmi, event, event->vcpu_id, 1, reset_trap);
+            vmi_step_event(vmi, event, event->vcpu_id, 1, vmi_reset_trap);
         }
         if(event->mem_event.out_access & VMI_MEMACCESS_W) {
-            printf("Write memaccess @ Symbol: %s!%s\n", s->conf->name, s->name);
+            printf("Write memaccess @ Symbol: %s!%s\n", s->config->name, s->symbol->name);
             clone->trap_reset = pa;
-            vmi_step_event(vmi, event, event->vcpu_id, 1, save_and_reset_trap);
+            vmi_step_event(vmi, event, event->vcpu_id, 1, vmi_save_and_reset_trap);
         }
     } else {
+        // Should not happen with BYTE events
         vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
     }
 
@@ -170,18 +113,22 @@ void mem_event_cb(vmi_instance_t vmi, vmi_event_t *event){
 
 void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
+    char *ts = NULL;
+    now(&ts);
+
     reg_t cr3;
     vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
-    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
     honeymon_clone_t *clone = event->data;
     addr_t pa = (event->interrupt_event.gfn<<12) + event->interrupt_event.offset;
-    struct symbol *s = g_tree_lookup(clone->pa_lookup, &pa);
-
-    //print_registers(vmi, event->vcpu_id);
+    struct symbolwrap *s = g_hash_table_lookup(clone->pa_lookup, &pa);
 
     if(s) {
-        printf("PID: %"PRIi32" PA=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
-          pid, pa, event->interrupt_event.gla, s->conf->name, s->name);
+        //printf("%s DTB: %"PRIi32" PA=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
+        //  ts, (int)cr3, pa, event->interrupt_event.gla, s->config->name, s->symbol->name);
+
+        if(!strncmp(s->symbol->name, "ExAllocatePoolWithTag", 21) || !strcmp(s->symbol->name, "ExAllocatePoolWithQuotaTag")) {
+            pool_tracker(vmi, event, cr3);
+        }
 
         // remove trap
         vmi_write_8_pa(vmi, pa, &s->backup);
@@ -190,12 +137,19 @@ void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         event->interrupt_event.enabled = 1;
         event->interrupt_event.reinject = 0;
         clone->trap_reset = pa;
-        vmi_step_event(vmi, event, event->vcpu_id, 1, reset_trap);
+        vmi_step_event(vmi, event, event->vcpu_id, 1, vmi_reset_trap);
     } else {
-        printf("Unknown Int3 event: PID: %"PRIi32" GFN=%"PRIx64" RIP=%"PRIx64"\n",
-            pid, event->interrupt_event.gfn, event->interrupt_event.gla);
-        event->interrupt_event.reinject = 1;
+        struct pool_lookup *pool = g_hash_table_lookup(clone->pool_lookup, &pa);
+        if(pool) {
+            pool_alloc_return(vmi, event, pa, cr3, ts, pool);
+        } else {
+            printf("%s Unknown Int3 event: DTB: %"PRIi32" PA=%"PRIx64" RIP=%"PRIx64"\n",
+                ts, (int)cr3,pa, event->interrupt_event.gla);
+            event->interrupt_event.reinject = 1;
+        }
     }
+
+    g_free(ts);
 }
 
 void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
@@ -206,56 +160,81 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
         char *pe_guid = NULL, *pdb_guid = NULL;
         get_guid(vmi, vaddr, pid, &pe_guid, &pdb_guid);
 
-        printf("\t\tPE: %s PDB: %s\n", pe_guid, pdb_guid);
+        //printf("\t\tPE: %s PDB: %s\n", pe_guid, pdb_guid);
 
-        struct guid_lookup *s = NULL;
+    GTree *guid_lookup = clone->honeymon->guids;
+
+        struct config *config = NULL;
         if(pdb_guid) {
-            s=g_tree_lookup(clone->guid_lookup, pdb_guid);
+            config=g_tree_lookup(guid_lookup, pdb_guid);
         } else if(pe_guid) {
-            s=g_tree_lookup(clone->guid_lookup, pe_guid);
+            config=g_tree_lookup(guid_lookup, pe_guid);
         }
 
-        if(s) {
+        if(config) {
             uint32_t i=0;
             uint64_t trapped = 0;
-            for(; i < *(s->conf->sym_count); i++) {
+            for(; i < *(config->sym_count); i++) {
+
+                // skip symbols starting with _ (latency)
+                if(config->syms[i].name[0] == 0x5f)
+                    continue;
+
+                // only trap Nt* functions in ntdll (latency)
+                if(!strcmp(config->name, "ntdll")) {
+                    if(strncmp(config->syms[i].name, "Nt", 2)) // && strncmp(s->conf->syms[i].name, "Zw", 2))
+                        continue;
+                }
+
+                //DEBUG
+                if(strcmp(config->name, "ntkrnlmp")) continue;
 
                 // get pa
                 addr_t pa =0;
-                if(!pid) {
-                    pa = vmi_translate_kv2p(vmi, vaddr + s->conf->syms[i].rva);
+                uint8_t byte = 0;
+
+                if(!pid || pid == 4) {
+                    pa = vmi_translate_kv2p(vmi, vaddr + config->syms[i].rva);
                 } else {
-                    pa = vmi_translate_uv2p(vmi, vaddr + s->conf->syms[i].rva, pid);
+                    pa = vmi_translate_uv2p(vmi, vaddr + config->syms[i].rva, pid);
                 }
 
                 // check if pa is valid and if already marked
-                if(!pa || g_tree_lookup(clone->pa_lookup, &pa)) {
+                if(!pa || g_hash_table_lookup(clone->pa_lookup, &pa)) {
                     continue;
                 }
 
                 // backup current byte
-                vmi_read_8_pa(vmi, pa, &s->conf->syms[i].backup);
+                vmi_read_8_pa(vmi, pa, &byte);
+
+                if(byte == TRAP) {
+                    //printf("\n\n** PA IS ALREADY TRAPPED @ 0x%lx **\n\n", pa);
+                    continue;
+                }
+
+                struct symbolwrap *wrap = g_malloc0(sizeof(struct symbolwrap));
+                wrap->vmi = vmi;
+                wrap->config = config;
+                wrap->symbol = &config->syms[i];
+                wrap->backup = byte;
+                wrap->pa = pa;
 
                 // write trap
                 vmi_write_8_pa(vmi, pa, &trap);
 
-                // set the pa on this symbol
-                s->conf->syms[i].pa = pa;
-
-                // save trap location into lookup tree
-                g_tree_insert(clone->pa_lookup, &s->conf->syms[i].pa, &s->conf->syms[i]);
-
-                if(NULL == vmi_get_mem_event(vmi, pa, VMI_MEMEVENT_PAGE)) {
-                    vmi_event_t *mem_event = g_malloc0(sizeof(vmi_event_t));
-                    SETUP_MEM_EVENT(mem_event, pa, VMI_MEMEVENT_PAGE, VMI_MEMACCESS_RW, mem_event_cb);
-                    mem_event->data = clone;
-                    if(VMI_FAILURE == vmi_register_event(vmi, mem_event)) {
-                        free(mem_event);
-                    }
+                wrap->guard = g_malloc0(sizeof(vmi_event_t));
+                SETUP_MEM_EVENT(wrap->guard, pa, VMI_MEMEVENT_BYTE, VMI_MEMACCESS_RW, mem_event_cb);
+                wrap->guard->data = clone;
+                if(VMI_FAILURE == vmi_register_event(vmi, wrap->guard)) {
+                    free(wrap->guard);
+                    wrap->guard = NULL;
                 }
 
+                // save trap location into lookup tree
+                g_hash_table_insert(clone->pa_lookup, &wrap->pa, wrap);
+
                 trapped++;
-                //printf("\t\tTrap added @ VA 0x%lx PA 0x%lx for %s!%s. Backup: 0x%x\n", vaddr + s->conf->syms[i].rva, s->conf->syms[i].pa, s->conf->name, s->conf->syms[i].name, s->conf->syms[i].backup);
+                printf("\t\tTrap added @ VA 0x%lx PA 0x%lx for %s!%s. Backup: 0x%x\n", vaddr + config->syms[i].rva, pa, config->name, config->syms[i].name, wrap->backup);
             }
 
             printf("\tInjected %lu traps into PE with GUID %s:%s\n", trapped, pe_guid, pdb_guid);
@@ -389,6 +368,7 @@ void *clone_vmi_thread(void *input) {
         }
     }
 
+    printf("Vmi clone thread exiting\n");
     pthread_exit(0);
     return NULL;
 }
@@ -403,7 +383,9 @@ void clone_vmi_init(honeymon_clone_t *clone) {
 
     /* partialy initialize the libvmi library */
     if (vmi_init_custom(&clone->vmi, VMI_XEN | VMI_INIT_PARTIAL | VMI_CONFIG_GHASHTABLE, (vmi_config_t)config) == VMI_FAILURE) {
-        clone->vmi = NULL;
+        g_hash_table_destroy(config);
+        vmi_destroy(clone->vmi);
+        clone->vmi=NULL;
         return;
     }
 
@@ -427,49 +409,47 @@ void clone_vmi_init(honeymon_clone_t *clone) {
     }
     g_hash_table_destroy(config);
 
-    // Crete Binary search trees to lokup symbols from
-    clone->guid_lookup = g_tree_new_full((GCompareDataFunc)strcmp, NULL, NULL, free_guid_lookup);
-    clone->pa_lookup = g_tree_new((GCompareFunc)intcmp);
+    // Crete tables to lokup symbols from
+    clone->pa_lookup = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_symbolwrap);
 
-    if(PM2BIT(clone->pm) == BIT64) {
-        uint32_t i=0;
-        for(;i<win7_sp1_x64_config_count;i++) {
-            struct guid_lookup *s = g_malloc0(sizeof(struct guid_lookup));
-            s->conf = &win7_sp1_x64_configs[i];
-            s->rva_lookup = g_tree_new((GCompareFunc)intcmp);
-
-            uint32_t z=0;
-            for(; z < *(s->conf->sym_count) ; z++) {
-                s->conf->syms[z].backup = s->conf->syms[z].pa = 0;
-                s->conf->syms[z].conf = s->conf;
-                g_tree_insert(s->rva_lookup, &s->conf->syms[z].rva, s->conf->syms[z].name);
-            }
-
-            g_tree_insert(clone->guid_lookup, s->conf->guids[0], s);
-            g_tree_insert(clone->guid_lookup, s->conf->guids[1], s);
-        }
-    }
+    // Pool/file watcher tables
+    clone->file_watch = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free_file_watch);
+    clone->pool_lookup = g_hash_table_new_full(g_int64_hash, g_int64_equal, NULL, free);
 
     inject_traps(clone);
 }
 
 // -------------------------- closing
 
-void free_guid_lookup(gpointer z) {
-    struct guid_lookup *s = (struct guid_lookup *)z;
-    if(!s->free) {
-        s->free++;
-    } else {
-        g_tree_destroy(s->rva_lookup);
-        free(s);
-        s=NULL;
+void free_symbolwrap(gpointer z) {
+    struct symbolwrap *wrap = (struct symbolwrap *)z;
+    // remove EPT guards
+    if(wrap && wrap->vmi && wrap->guard) {
+        vmi_clear_event(wrap->vmi, wrap->guard);
+        // remove INT trap
+        vmi_write_8_pa(wrap->vmi, wrap->pa, &wrap->backup);
+        free(wrap->guard);
+        free(wrap);
     }
 }
 
+void free_file_watch(gpointer z) {
+    if(!z) return;
+    struct file_watch *watch = (struct file_watch *)z;
+    if(watch->event) {
+        if(VMI_SUCCESS == vmi_clear_event(watch->vmi, watch->event))
+            free(watch->event);
+    }
+    free(watch);
+}
+
 void close_vmi_clone(honeymon_clone_t *clone) {
-    g_tree_destroy(clone->guid_lookup);
-    g_tree_destroy(clone->pa_lookup);
+    g_hash_table_destroy(clone->pa_lookup);
+    g_hash_table_destroy(clone->pool_lookup);
+    g_hash_table_destroy(clone->file_watch);
     if(clone->vmi) {
         vmi_destroy(clone->vmi);
+        clone->vmi = NULL;
     }
+    printf("close_vmi_clone finished\n");
 }

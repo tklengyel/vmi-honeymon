@@ -1,6 +1,6 @@
 # This file is part of the VMI-Honeymon project.
 #
-# 2012-2013 University of Connecticut (http://www.uconn.edu)
+# 2012-2014 University of Connecticut (http://www.uconn.edu)
 # Tamas K Lengyel (tamas.k.lengyel@gmail.com)
 #
 #  VMI-Honeymon is free software; you can redistribute it and/or modify
@@ -18,16 +18,17 @@
  
 bin_PROGRAMS = vmi-honeymon
 
-vmi_honeymon_SOURCES =  vmi-honeymon.c vmi-honeymon.h
-vmi_honeymon_SOURCES += input_parser.c input_parser.h
-vmi_honeymon_SOURCES += xen_helper.c xen_helper.h
-vmi_honeymon_SOURCES += honeypots.c honeypots.h
-vmi_honeymon_SOURCES += guestfs_helper.c guestfs_helper.h
-vmi_honeymon_SOURCES += log.c log.h
-vmi_honeymon_SOURCES += log_mysql.c log_mysql.h
-vmi_honeymon_SOURCES += rpc_server.c rpc_server.h
-vmi_honeymon_SOURCES += vmi.c vmi.h
-vmi_honeymon_SOURCES += win-guid.c win-guid.h
+vmi_honeymon_SOURCES =  vmi-honeymon.c input_parser.c xen_helper.c \
+                        honeypots.c scan.c rpc_server.c \
+                        file_extractor.c log.c log_mysql.c \
+                        vmi.c win-guid.c vmi-poolmon.c pooltag.c
+
+vmi_honeymon_h =  structures.h vmi-honeymon.h input_parser.h xen_helper.h \
+                        honeypots.h scan.h rpc_server.h \
+                        file_extractor.h log.h log_mysql.h \
+                        vmi.h win-guid.h vmi-poolmon.h pooltag.h
+
+vmi_honeymon_SOURCES += $(vmi_honeymon_h)
 
 AM_CFLAGS = $(CFLAGS)
 AM_CFLAGS += $(VMI_CFLAGS)
@@ -44,8 +45,7 @@ endif
 # Note that -pg is incompatible with HARDENING
 if DEBUG
 AM_CFLAGS += -DHONEYMON_DEBUG -Wall -Wextra -Wno-override-init -Wno-strict-aliasing -g -ggdb3
-AM_CFLAGS += -Wno-unused-parameter
-# -Wno-unused-but-set-variable -Wno-unused-variable
+AM_CFLAGS += -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-unused-variable
 if !HARDENING
 AM_CFLAGS += -pg
 endif

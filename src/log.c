@@ -1,7 +1,7 @@
 /*
  * This file is part of the VMI-Honeymon project.
  *
- * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * 2012-2014 University of Connecticut (http://www.uconn.edu)
  * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
  *
  * VMI-Honeymon is free software; you can redistribute it and/or modify
@@ -20,13 +20,23 @@
 
 #include <config.h>
 #include <pthread.h>
+#include <glib.h>
 
 #ifdef HAVE_MYSQL
 #include <mysql.h>
 #endif
 
 #include "structures.h"
-#include "log_mysql.h"
+//#include "log_mysql.h"
+
+/*
+ * return the current timestamp as a string
+ */
+void now(char** ts) {
+    GTimeVal now;
+    g_get_current_time(&now);
+    *ts = g_time_val_to_iso8601(&now);
+}
 
 void honeymon_log_init_interface(honeymon_t *honeymon) {
 
@@ -42,12 +52,9 @@ void honeymon_log_init_interface(honeymon_t *honeymon) {
 #endif
 }
 
+//#ifdef HAVE_MYSQL
+
 void honeymon_log_free_interface(honeymon_t *honeymon) {
-
-#ifdef HAVE_MYSQL
-
-#endif
-
     pthread_mutex_destroy(&(honeymon->log->log_IDX_lock));
     free(honeymon->log);
 }
@@ -82,3 +89,4 @@ void honeymon_log_membenchmark(honeymon_t *honeymon, uint32_t logIDX,
     if (honeymon->log->mysql_enabled) honeymon_mysql_log_membenchmark(honeymon,
             logIDX, current_mem, shared_mem, max_mem);
 }
+//#endif

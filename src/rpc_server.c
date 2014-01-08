@@ -85,7 +85,7 @@ rpc_stop_clone(xmlrpc_env * const envP,
 	char *s = NULL;
 	xmlrpc_decompose_value(envP, paramArrayP, "(s)", &s);
 
-	honeymon_clone_t *clone = honeymon_honeypots_get_free(honeymon, s);
+	honeymon_clone_t *clone = honeymon_honeypots_find_clone(honeymon, s);
     if(clone) {
         g_cond_signal(&(clone->cond));
     }

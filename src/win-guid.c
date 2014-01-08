@@ -1,23 +1,21 @@
-/* The LibVMI Library is an introspection library that simplifies access to
- * memory in a target virtual machine or in a file containing a dump of
- * a system's physical memory.  LibVMI is based on the XenAccess Library.
+/*
+ * This file is part of the VMI-Honeymon project.
  *
- * Author: Tamas K Lengyel (tamas.lengyel@zentific.com)
+ * 2012-2014 University of Connecticut (http://www.uconn.edu)
+ * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
  *
- * This file is part of LibVMI.
+ * VMI-Honeymon is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
  *
- * LibVMI is free software: you can redistribute it and/or modify it under
- * the terms of the GNU Lesser General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or (at your
- * option) any later version.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- * LibVMI is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
- * License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with LibVMI.  If not, see <http://www.gnu.org/licenses/>.
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <libvmi/libvmi.h>
@@ -87,7 +85,7 @@ struct cv_info_nb10 {
     uint8_t  pdb_file_name[];
 } __attribute__ ((packed));
 
-status_t is_WINDOWS_KERNEL(vmi_instance_t vmi, addr_t base_p, uint8_t *pe) {
+/*status_t is_WINDOWS_KERNEL(vmi_instance_t vmi, addr_t base_p, uint8_t *pe) {
 
     status_t ret = VMI_FAILURE;
 
@@ -116,7 +114,7 @@ status_t is_WINDOWS_KERNEL(vmi_instance_t vmi, addr_t base_p, uint8_t *pe) {
     return ret;
 }
 
-/*void print_os_version(vmi_instance_t vmi, addr_t kernel_base_p, uint8_t* pe) {
+void print_os_version(vmi_instance_t vmi, addr_t kernel_base_p, uint8_t* pe) {
 
     uint16_t major_os_version;
     uint16_t minor_os_version;
@@ -185,7 +183,7 @@ status_t get_guid(vmi_instance_t vmi, addr_t base_vaddr, uint32_t pid, char **pe
     uint8_t pe[MAX_HEADER_SIZE];
 
     if(VMI_FAILURE == peparse_get_image_virt(vmi, base_vaddr, pid, MAX_HEADER_SIZE, pe)) {
-        printf("Failed to read PE header @ %u:0x%lx\n", pid, base_vaddr);
+        //printf("Failed to read PE header @ %u:0x%lx\n", pid, base_vaddr);
         return ret;
     }
 
@@ -237,7 +235,7 @@ status_t get_guid(vmi_instance_t vmi, addr_t base_vaddr, uint32_t pid, char **pe
     if(pdb_rsds_header->cv_signature != RSDS) {
         if(pdb_rsds_header->cv_signature != NB10) {
             //printf("The CodeView debug information has to be in PDB 7.0 (RSDS) or NB10 format!\n");
-            return ret;
+            goto done;
         }
 
         pdb_nb10_header = (struct cv_info_nb10 *)pdb_rsds_header;
@@ -270,6 +268,7 @@ status_t get_guid(vmi_instance_t vmi, addr_t base_vaddr, uint32_t pid, char **pe
 
     ret=VMI_SUCCESS;
 
+done:
     free(pdb_rsds_header);
     free(filename);
 

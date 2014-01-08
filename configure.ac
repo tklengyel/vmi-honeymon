@@ -131,6 +131,9 @@ PKG_CHECK_MODULES([VMI], [libvmi], [], [AC_ERROR([LibVMI not found])])
 AC_CHECK_HEADER([lvm2app.h], [], [AC_ERROR([No lvm2app.h found])], [[#include <libdevmapper.h>]])
 AC_CHECK_LIB(lvm2app, lvm_lv_snapshot, [], [AC_ERROR([LibLVM (lvm2app) is unusable])])
 
+AC_CHECK_HEADER([parted/parted.h], [], [AC_ERROR([No parted/parted.h found])])
+AC_CHECK_LIB(parted, ped_device_get, [], [AC_ERROR([Libparted is unusable])])
+
 AC_CHECK_HEADERS([libxl.h libxl_utils.h], [], [AC_ERROR([Standard Xenlight (libxl) headers not found!])])
 AC_CHECK_LIB(xenlight, 
 	[libxl_domain_create_new, libxl_domain_destroy, libxl_domain_suspend, 
@@ -166,12 +169,29 @@ AC_CHECK_LIB([xenctrl],
 	[xc_interface_open, xc_memshr_control, xc_memshr_nominate_gfn, xc_memshr_share_gfns], 
 	[], [AC_ERROR([XenCtrl is unusable! Do you have Xen 4.2+ installed?])])
 
-# Check for LibGuestFS
-AC_CHECK_LIB(guestfs, 
-	[guestfs_create, guestfs_add_drive_ro, guestfs_launch, guestfs_mount, 
-	guestfs_copy_device_to_file, guestfs_checksum, guestfs_shutdown, guestfs_close],
-	[],
-	[AC_MSG_NOTICE([*** No LibGuestFS present])])
+# Check for KPARTX
+AC_PATH_PROG(KPARTX, kpartx)
+if test "x$KPARTX" != "x"; then
+    AC_DEFINE_UNQUOTED(KPARTX, "$KPARTX", "KPARTX path")
+else
+    AC_ERROR([KPARTX was not found!])
+fi
+
+# Check for MOUNT
+AC_PATH_PROG(MOUNT, mount)
+if test "x$MOUNT" != "x"; then
+    AC_DEFINE_UNQUOTED(MOUNT, "$MOUNT", "MOUNT path")
+else
+    AC_ERROR([MOUNT was not found!])
+fi
+
+# Check for UMOUNT
+AC_PATH_PROG(UMOUNT, umount)
+if test "x$UMOUNT" != "x"; then
+    AC_DEFINE_UNQUOTED(UMOUNT, "$UMOUNT", "UMOUNT path")
+else
+    AC_ERROR([UMOUNT was not found!])
+fi
 
 AC_CHECK_HEADER([magic.h], [
     AC_CHECK_LIB(magic, [magic_open, magic_load, magic_close, magic_file])

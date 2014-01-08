@@ -35,8 +35,8 @@
 #include "log.h"
 #include "honeypots.h"
 #include "xen_helper.h"
-#include "guestfs_helper.h"
 #include "vmi.h"
+#include "file_extractor.h"
 
 void honeymon_honeypots_build_list(honeymon_t *honeymon) {
     if (honeymon->workdir == NULL || honeymon->originsdir == NULL) {
@@ -214,29 +214,12 @@ void honeymon_honeypots_list(honeymon_t *honeymon) {
             (GTraverseFunc) honeymon_honeypots_list_loop, NULL);
 }
 
-void* honeymon_honeypot_membench(void *input) {
-    honeymon_clone_t *clone = (honeymon_clone_t *) input;
-
-    printf("Starting mem benchmark thread for %s\n", clone->clone_name);
-    int count = 0;
-
-    if (clone != NULL && clone->logIDX > 0) while (clone->membench) {
-        libxl_dominfo info;
-        libxl_domain_info(clone->honeymon->xen->xl_ctx, &info, clone->domID);
-        honeymon_log_membenchmark(clone->honeymon, clone->logIDX,
-                info.current_memkb, info.shared_memkb, info.max_memkb);
-        sleep(1);
-        count++;
-    }
-
-    pthread_exit(0);
-    return NULL;
-}
-
 /* Honeypot thread to start scans periodically */
 void* honeymon_honeypot_runner(void *input) {
     honeymon_clone_t* clone = (honeymon_clone_t *) input;
     honeymon_t *honeymon = clone->honeymon;
+
+    printf("Honeypot runner thread started for %s\n", clone->clone_name);
 
     g_mutex_lock(&(clone->lock));
     if (clone->active && clone->paused) {
@@ -253,10 +236,15 @@ void* honeymon_honeypot_runner(void *input) {
     // wait for end signal
     g_cond_wait(&clone->cond, &clone->lock);
 
+    printf("Clone %s received end signal\n", clone->clone_name);
+
     libxl_domain_pause(honeymon->xen->xl_ctx, clone->domID);
 
     clone->interrupted = 1;
     pthread_join(clone->vmi_thread, NULL);
+
+    // shutdown
+    if(!clone->active) goto done;
 
     printf("Destroying clone %s\n", clone->clone_name);
     libxl_domain_destroy(honeymon->xen->xl_ctx, clone->domID, NULL);
@@ -264,6 +252,20 @@ void* honeymon_honeypot_runner(void *input) {
     g_tree_steal(clone->origin->clone_list, clone->clone_name);
     clone->origin->clones--;
     g_mutex_unlock(&clone->origin->lock);
+
+    extract_files(clone);
+
+    char* config_path = g_malloc0(
+                snprintf(NULL, 0, "%s/%s.config", clone->honeymon->honeypotsdir,
+                        clone->clone_name) + 1);
+    sprintf(config_path, "%s/%s.config", clone->honeymon->honeypotsdir,
+                clone->clone_name);
+    unlink(config_path);
+    free(config_path);
+
+    lv_t clone_lv = lvm_lv_from_name(clone->origin->vg, clone->clone_name);
+    lvm_vg_remove_lv(clone_lv);
+
     honeymon_free_clone(clone);
 
     done: printf("Clone thread is exiting.\n");
@@ -480,6 +482,8 @@ honeymon_clone_t* honeymon_honeypots_init_clone(honeymon_t *honeymon,
 
         g_mutex_init(&(clone->lock));
         g_cond_init(&(clone->cond));
+
+        clone->files_accessed = g_tree_new_full((GCompareDataFunc)strcmp, NULL, free, NULL);
 
         clone_vmi_init(clone);
 
@@ -716,9 +720,9 @@ void honeymon_free_clone(honeymon_clone_t *clone) {
         g_mutex_clear(&(clone->lock));
         g_cond_clear(&(clone->cond));
 
-        honeymon_guestfs_stop(clone);
         close_vmi_clone(clone);
 
+        g_tree_destroy(clone->files_accessed);
         g_free(clone->clone_name);
         g_free(clone->origin_name);
         g_free(clone->config_path);
@@ -737,6 +741,7 @@ void honeymon_honeypots_destroy_clone_t(honeymon_clone_t *clone) {
     pthread_join(clone->signal_thread, NULL);
 
     honeymon_free_clone(clone);
+    printf("Clearing honeypot done\n");
 }
 
 void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {

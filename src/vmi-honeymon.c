@@ -42,6 +42,7 @@
 #include "honeypots.h"
 #include "rpc_server.h"
 #include "log.h"
+#include "vmi.h"
 
 //TODO
 void honeymon_interrupt(int signal) {
@@ -86,6 +87,9 @@ void honeymon_init() {
 
     pthread_create(&(honeymon->clone_factory), NULL,
             honeymon_honeypot_clone_factory, (void *) honeymon);
+
+    pooltag_build_tree(honeymon);
+    vmi_build_guid_tree(honeymon);
 }
 
 void honeymon_free(honeymon_t* honeymon) {
@@ -99,6 +103,8 @@ void honeymon_free(honeymon_t* honeymon) {
         honeymon_xen_free_interface(honeymon->xen);
         g_async_queue_unref(honeymon->clone_requests);
         lvm_quit(honeymon->lvm);
+        g_tree_destroy(honeymon->guids);
+        g_tree_destroy(honeymon->pooltags);
         g_free(honeymon->log);
         g_free(honeymon);
     }

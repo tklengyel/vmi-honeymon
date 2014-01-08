@@ -1,7 +1,7 @@
 /*
  * This file is part of the VMI-Honeymon project.
  *
- * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * 2012-2014 University of Connecticut (http://www.uconn.edu)
  * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
  *
  * VMI-Honeymon is free software; you can redistribute it and/or modify
@@ -22,12 +22,111 @@
 #define VMI_H
 
 #include "structures.h"
+#include "win7_sp1_x64_config.h"
+#include "vmi-poolmon.h"
+
+#define BIT32 0
+#define BIT64 1
+#define PM2BIT(pm) ((pm == VMI_PM_IA32E) ? BIT64 : BIT32)
+
+#define TRAP 0xCC
+
+#define ghashtable_foreach(table, i, key, val) \
+        g_hash_table_iter_init(&i, table); \
+        while(g_hash_table_iter_next(&i,(void**)&key,(void**)&val))
+
+enum offset {
+    EPROCESS_PID,
+    EPROCESS_PDBASE,
+    EPROCESS_PNAME,
+    EPROCESS_TASKS,
+    EPROCESS_PEB,
+
+    PEB_IMAGEBASADDRESS,
+    PEB_LDR,
+
+    PEB_LDR_DATA_INLOADORDERMODULELIST,
+
+    LDR_DATA_TABLE_ENTRY_DLLBASE,
+
+    FILE_OBJECT_DEVICEOBJECT,
+    FILE_OBJECT_FILENAME,
+
+    OFFSET_MAX
+};
+
+static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
+    [VMI_OS_WINDOWS_XP] =  {
+        [BIT32] = {
+        },
+    },
+    [VMI_OS_WINDOWS_7] = {
+        [BIT32] = {
+            [EPROCESS_PID]                      = 0xb4,
+            [EPROCESS_PDBASE]                   = 0x18,
+            [EPROCESS_TASKS]                    = 0xb8,
+            [EPROCESS_PNAME]                    = 0x16c,
+        },
+        [BIT64] = {
+            [EPROCESS_PID]                      = 0x180,
+            [EPROCESS_PDBASE]                   = 0x28,
+            [EPROCESS_TASKS]                    = 0x188,
+            [EPROCESS_PNAME]                    = 0x2e0,
+            [EPROCESS_PEB]                      = 0x338,
+
+            [PEB_IMAGEBASADDRESS]               = 0x10,
+            [PEB_LDR]                           = 0x18,
+
+            [PEB_LDR_DATA_INLOADORDERMODULELIST]= 0x10,
+
+            [LDR_DATA_TABLE_ENTRY_DLLBASE]      = 0x30,
+
+            [FILE_OBJECT_FILENAME]              = 0x58,
+            [FILE_OBJECT_DEVICEOBJECT]          = 0x8,
+        }
+    },
+};
+
+enum size {
+    FILE_OBJECT,
+
+    SIZE_LIST_MAX
+};
+
+// Aligned object sizes
+static size_t sizes[VMI_OS_WINDOWS_7+1][2][SIZE_LIST_MAX] = {
+    [VMI_OS_WINDOWS_7] = {
+        [BIT32] = {
+        },
+        [BIT64] = {
+            [FILE_OBJECT] = 0xE0, // 0xd8 + 0x10 - 0x8
+        },
+    },
+};
+
+struct unicode_string_x32 {
+    uint16_t length;
+    uint16_t maximum_length;
+    uint32_t buffer; // pointer
+} __attribute__ ((packed));
+
+struct unicode_string_x64 {
+    uint16_t length;
+    uint16_t maximum_length;
+    uint32_t _unused;
+    uint64_t buffer; // pointer
+} __attribute__ ((packed));
+
+void vmi_build_guid_tree(honeymon_t *honeymon);
 
 void *clone_vmi_thread(void *input);
 void clone_vmi_init(honeymon_clone_t *clone);
 void close_vmi_clone(honeymon_clone_t *clone);
 
-void free_page_lookup(gpointer data);
-void free_guid_lookup(gpointer s);
+void vmi_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
+void vmi_save_and_reset_trap(vmi_instance_t vmi, vmi_event_t *event);
 
+void free_guid_lookup(gpointer s);
+void free_symbolwrap(gpointer z);
+void free_file_watch(gpointer z);
 #endif

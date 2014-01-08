@@ -1,7 +1,7 @@
 /*
  * This file is part of the VMI-Honeymon project.
  *
- * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * 2012-2014 University of Connecticut (http://www.uconn.edu)
  * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
  *
  * VMI-Honeymon is free software; you can redistribute it and/or modify

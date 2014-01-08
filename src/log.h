@@ -1,7 +1,7 @@
 /*
  * This file is part of the VMI-Honeymon project.
  *
- * 2012-2013 University of Connecticut (http://www.uconn.edu)
+ * 2012-2014 University of Connecticut (http://www.uconn.edu)
  * Tamas K Lengyel <tamas.k.lengyel@gmail.com>
  *
  * VMI-Honeymon is free software; you can redistribute it and/or modify
@@ -21,9 +21,9 @@
 #ifndef LOG_H
 #define LOG_H
 
-#include "log_mysql.h"
-
 #define printdbg(...) g_printerr(__VA_ARGS__)
+
+void now(char** ts);
 
 void honeymon_log_session(honeymon_t *honeymon, honeymon_clone_t *clone);
 void honeymon_log_scan(honeymon_t *honeymon, honeymon_clone_t *clone,
