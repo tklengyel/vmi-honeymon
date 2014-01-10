@@ -41,6 +41,8 @@
 
 #include "win-guid.h"
 #include "vmi.h"
+#include "vmi-poolmon.h"
+#include "file_extractor.h"
 
 void vmi_build_guid_tree(honeymon_t *honeymon) {
     honeymon->guids = g_tree_new((GCompareFunc)strcmp);
@@ -126,8 +128,16 @@ void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         //printf("%s DTB: %"PRIi32" PA=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
         //  ts, (int)cr3, pa, event->interrupt_event.gla, s->config->name, s->symbol->name);
 
-        if(!strncmp(s->symbol->name, "ExAllocatePoolWithTag", 21) || !strcmp(s->symbol->name, "ExAllocatePoolWithQuotaTag")) {
-            pool_tracker(vmi, event, cr3);
+        if(!strcmp(s->config->name,"ntkrnlmp")) {
+            if(!strncmp(s->symbol->name, "ExAllocatePoolWithTag", 21) || !strcmp(s->symbol->name, "ExAllocatePoolWithQuotaTag")) {
+                pool_tracker(vmi, event, cr3);
+            }
+
+            if(!strcmp(s->symbol->name, "NtDeleteFile") || !strcmp(s->symbol->name, "ZwDeleteFile") ||
+               !strcmp(s->symbol->name, "NtSetInformationFile") || !strcmp(s->symbol->name, "ZwSetInformationFile")
+            ) {
+                grab_file_before_delete(vmi, event, cr3, s);
+            }
         }
 
         // remove trap

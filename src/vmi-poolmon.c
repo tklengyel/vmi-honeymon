@@ -48,8 +48,8 @@ void file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
     uint16_t length = 0;
     uint16_t max = 0;
     if(PM2BIT(watch->clone->pm)==BIT32) {
-        struct unicode_string_x32 us;
-        vmi_read_pa(vmi, watch->file_name, &us, sizeof(struct unicode_string_x32));
+        struct unicode_string_x86 us;
+        vmi_read_pa(vmi, watch->file_name, &us, sizeof(struct unicode_string_x86));
         file_name = us.buffer;
         length = us.length;
         max = us.maximum_length;
@@ -71,14 +71,14 @@ void file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
         unicode_string_t str2 = {0};
         vmi_convert_str_encoding(&str, &str2, "UTF-8");
 
-        printf("\tFile accessed: %s\n", str2.contents);
+        if(str2.contents) printf("\tFile accessed: %s\n", str2.contents);
 
         g_hash_table_remove(watch->clone->file_watch, &watch->pa);
 
-        if(!g_tree_lookup(watch->clone->files_accessed, str2.contents)) {
+        if(str2.contents && !g_tree_lookup(watch->clone->files_accessed, str2.contents)) {
             g_tree_insert(watch->clone->files_accessed, str2.contents, str2.contents);
         } else {
-            free(str2.contents);
+            g_free(str2.contents);
         }
 
         free(str.contents);
@@ -187,6 +187,7 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa, reg_t 
     }
 
     // Create mem event to catch when the memory space of the struct gets written to
+    // so we can extract the path of the file
     addr_t obj_pa;
     if(pid && pid != 4) {
         obj_pa = vmi_translate_uv2p(vmi, rax, pid);

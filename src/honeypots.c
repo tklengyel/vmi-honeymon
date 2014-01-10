@@ -253,7 +253,7 @@ void* honeymon_honeypot_runner(void *input) {
     clone->origin->clones--;
     g_mutex_unlock(&clone->origin->lock);
 
-    extract_files(clone);
+    extract_file(clone, NULL, clone->files_accessed);
 
     char* config_path = g_malloc0(
                 snprintf(NULL, 0, "%s/%s.config", clone->honeymon->honeypotsdir,

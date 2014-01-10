@@ -68,44 +68,6 @@ struct pool_header_x64 {
     uint64_t process_billed; // _EPROCESS *
 } __attribute__ ((packed));
 
-struct object_header_win7_x32 {
-    uint32_t pointer_count;
-    union {
-        uint32_t handle_count;
-        uint32_t next_to_free; // void *
-    };
-    uint32_t lock; // _EX_PUSH_LOCK
-    unsigned char type_index; // id in the typeindex array
-    unsigned char trace_flags;
-    unsigned char info_mask;
-    unsigned char flags;
-    union {
-        uint32_t object_create_info; // _OBJECT_CREATE_INFORMATION *
-        uint32_t quota_block_charged; // void*
-    };
-    uint32_t security_descriptor; // void*
-//    uint64_t body; // _QUAD
-}  __attribute__ ((packed));
-
-struct object_header_win7_x64 {
-    uint64_t pointer_count;
-    union {
-        uint64_t handle_counter;
-        uint64_t next_to_free; // void *
-    };
-    uint64_t lock; //_EX_PUSH_LOCK
-    unsigned char type_index; // id in the typeindex array
-    unsigned char trace_flags;
-    unsigned char info_mask;
-    unsigned char flags;
-    union {
-        uint64_t object_create_info; // _OBJECT_CREATE_INFORMATION *
-        uint64_t quota_block_charged; // void*
-    };
-    uint64_t security_descriptor; // void*
-//    uint64_t body; // _QUAD
-}  __attribute__ ((packed));
-
 /* win7 typeindex */
 #define WIN7_TYPEINDEX_SIZE 44
 static char *win7_typeindex[WIN7_TYPEINDEX_SIZE] = {
