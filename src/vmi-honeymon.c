@@ -239,23 +239,14 @@ void honeymon_shell_print_menu() {
     printf("Please select an option:\n");
     printf("\t[workdir <dir>]:			Set working directory\n");
     printf("\t[volatility <path>]:			Set Volatility vol.py path\n");
-    printf(
-            "\t[scanconf <path>]:			Set and initiate list of Volatility scans\n");
-    printf(
-            "\t[scanschedule <path>]:		\tSet and initiate schedule of Volatility scans\n");
+    printf("\t[scanconf <path>]:			Set and initiate list of Volatility scans\n");
+    printf("\t[scanschedule <path>]:		\tSet and initiate schedule of Volatility scans\n");
     printf("\t[list|l {honeypots}]:			List all VM's or only honeypots\n");
-    printf(
-            "\t[designate|d <domID>]:		\tDesignate a running VM to be clone origin\n");
-    printf("\t[restore|r <origin>]:		Restore <origin>\n");
-    printf(
-            "\t[clone|c <origin>]:			Setup clones of an origin VM (buffer size: %u)\n",
-            CLONE_BUFFER);
+    printf("\t[designate|d <domID>]:		\tDesignate a running VM to be clone origin\n");
+    printf("\t[restore|r <origin>]:		    \tRestore <origin>\n");
+    printf("\t[clone|c <origin>]:			Setup clones of an origin VM (buffer size: %u)\n", CLONE_BUFFER);
     printf("\t[unpause|u <origin>]:			Unpause all the clones of <origin>\n");
     printf("\t[pause|p <origin>]:			Pause all the clones of <origin>\n");
-    printf("\t[tcpport <port #>]:			TCP port to listen on\n");
-    printf("\t[tcpif <IP>]:				IP to listen on (or \"any\")\n");
-    printf("\t[tcpinit]:				Start TCP listener\n");
-    //printf("\t[watch|w]:				Watch live action\n");
     printf("\t[quit|q]:				Quit \n");
     printf("\t[help|?|h]:			 	Print this help\n");
 

@@ -55,20 +55,15 @@ void honeymon_honeypots_build_list(honeymon_t *honeymon) {
             char* file_name = strdup(ep->d_name);
             char* name = strtok(file_name, delim);
             char* extension = strtok(NULL, delim);
-            char* fschecksum = strtok(NULL, delim);
             if (name != NULL && extension != NULL) {
                 honeymon_honeypot_t *honeypot =
                         honeymon_honeypots_init_honeypot(honeymon, name);
 
-                if (fschecksum != NULL
-                        && !strcmp(fschecksum, GUESTFS_HASH_TYPE)) {
-#ifdef HAVE_LIBGUESTFS
-                    char delim2[] = "_";
-                    char delim3[] = " ";
-                    char *dev=strtok(extension, delim2);
-                    int devID=atoi(strtok(NULL, delim2));
+                if (!strcmp(extension, "md5")) {
 
-                    char* path=malloc(snprintf(NULL, 0, "%s/%s", honeymon->originsdir, ep->d_name) + 1);
+                    char delim2[] = ",";
+
+                    char* path=g_malloc0(snprintf(NULL, 0, "%s/%s", honeymon->originsdir, ep->d_name) + 1);
                     sprintf(path, "%s/%s", honeymon->originsdir, ep->d_name);
                     printf("\tReading checksum file %s\n", path);
                     FILE *file = fopen ( path, "r" );
@@ -78,28 +73,24 @@ void honeymon_honeypots_build_list(honeymon_t *honeymon) {
                         holder=g_tree_new_full((GCompareDataFunc)strcmp, NULL, (GDestroyNotify)free, (GDestroyNotify)free);
 
                         while ( fgets ( line, 2048, file ) != NULL ) {
-                            char *hash=strdup(strtok(line, delim3));
-                            char *f=strdup(strtok(NULL, delim3));
+                            char *hash=strdup(strtok(line, delim2));
+                            char *f=strdup(strtok(NULL, delim2));
                             memmove(f, f+1, strlen(f));
                             char *nl = strrchr(f, '\n');
                             if (nl) *nl = '\0';
                             nl = strrchr(f, '\r');
                             if (nl) *nl = '\0';
 
-                            //printf("Inserting key %s with data %s\n", f, hash);
+                            printf("Inserting key %s with data %s\n", f, hash);
                             g_tree_insert(holder, f, hash);
                         }
                         fclose ( file );
 
                         //printf("Appending checksum list with new tree..\n");
-                        honeypot->fschecksum=g_slist_append(honeypot->fschecksum, (gpointer)holder);
+                        honeypot->fschecksum=holder;
                     }
 
                     free(path);
-#else
-                    //printf("\tLibGuestFS is present, skipping hash load.\n");
-#endif
-                    //printf("\tFound fs checksum for dev ID %i\n", devID);
                 }
             }
 
@@ -757,6 +748,7 @@ void honeymon_honeypots_destroy_honeypot_t(honeymon_honeypot_t *honeypot) {
     lvm_vg_close(honeypot->vg);
     xlu_cfg_destroy((XLU_Config *) honeypot->config);
     g_free(honeypot->origin_name);
+    if(honeypot->fschecksum) g_tree_destroy(honeypot->fschecksum);
     g_mutex_clear(&honeypot->lock);
     g_free(honeypot);
 }

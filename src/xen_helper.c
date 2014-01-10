@@ -39,6 +39,7 @@
 #include "xen_helper.h"
 #include "log.h"
 #include "honeypots.h"
+#include "file_extractor.h"
 
 bool honeymon_xen_init_interface(honeymon_t* honeymon) {
 
@@ -288,8 +289,9 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, const char* dom) {
         goto done;
     }
 
-    // Update config
+    printf("\tLVM: /dev/%s/%s\n", honeypot->vg_name, clone_name);
 
+    // Update config
     // Replace network bridge
     char delim2[] = ",=";
 
@@ -326,6 +328,11 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, const char* dom) {
     g_string_append(new_vif, VIF_APPEND);
     printf("New vif is %s\n", new_vif->str);
     vifs->values[0] = g_string_free(new_vif, FALSE);
+
+    // Replace disk config
+    free(disks->values[0]);
+    disks->values[0]=g_malloc0(snprintf(NULL, 0, "phy:/dev/%s/%s,xvda,w", honeypot->vg_name, clone_name) + 1);
+    sprintf(disks->values[0], "phy:/dev/%s/%s,xvda,w", honeypot->vg_name, clone_name);
 
     // Update the name in the config
     XLU_ConfigList2 *search = honeypot->config->settings;
@@ -564,29 +571,16 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
     honeymon_honeypot_t* honeypot = honeymon_honeypots_init_honeypot(honeymon,
             name);
 
-#ifdef HAVE_LIBGUESTFS
     XLU_Config2 *xlu_config = (XLU_Config2 *)honeymon_xen_parse_domconfig_raw(config);
-
-    int number_of_disks;
-    XLU_ConfigList *disks_masked=NULL;
-    XLU_ConfigList2 *disks=NULL;
-    if(xlu_cfg_get_list((XLU_Config *)xlu_config, "disk", &disks_masked, &number_of_disks, 0)) {
-        printf("The VM config didn't contain a disk configuration line!\n");
-    } else
-    disks=(XLU_ConfigList2 *)disks_masked;
-
-    if(number_of_disks<1) {
-        printf("No disks are defined in the config!\n");
-    }
-
-    char *disk_path=honeymon_xen_first_disk_path((XLU_ConfigList *)disks_masked);
+    char *disk_path=honeymon_xen_first_disk_path(xlu_config);
 
     if(disk_path!=NULL) {
         printf("The original disk path is %s\n", disk_path);
-        honeymon_guestfs_checksum(honeymon, honeypot, disk_path);
-    }
 
-#endif
+        create_checksum(honeymon, honeypot);
+
+        //TODO: MD5 checksum
+    }
 
     printf("Done!\n");
 

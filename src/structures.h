@@ -25,7 +25,6 @@
  * These are some internal definitions used to configure various aspects of VMI-Honeymon
  * TODO: Convert these to input parameters
  */
-#define GUESTFS_HASH_TYPE "SHA1"
 #define CLONE_BUFFER 5
 #define MIN_VLAN 10
 #define VIF_APPEND "script=vif-openvswitch,backend=openvswitch"
@@ -64,10 +63,6 @@
 
 #ifdef HAVE_MYSQL
 #include <mysql.h>
-#endif
-
-#ifdef HAVE_LIBGUESTFS
-#include <guestfs.h>
 #endif
 
 #ifdef HAVE_LIBMAGIC
@@ -205,7 +200,7 @@ typedef struct honeypot {
     unsigned int clone_buffer; // number of inactive clones to keep around at any time
     GTree* clone_list; // clone list of honeymon_clone_t
 
-    GSList* fschecksum; // each node is a GTree with the file path as key and hash as value
+    GTree* fschecksum; // each node is a GTree with the file path as key and hash as value
 } honeymon_honeypot_t;
 
 struct symbol {

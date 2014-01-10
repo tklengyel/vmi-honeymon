@@ -69,16 +69,18 @@ void file_name_post_cb(vmi_instance_t vmi, vmi_event_t *event) {
         vmi_read_va(vmi,file_name,0,str.contents,length);
 
         unicode_string_t str2 = {0};
-        vmi_convert_str_encoding(&str, &str2, "UTF-8");
+        status_t rc = vmi_convert_str_encoding(&str, &str2, "UTF-8");
 
-        if(str2.contents) printf("\tFile accessed: %s\n", str2.contents);
+        if(VMI_SUCCESS == rc) {
+            printf("\tFile accessed: %s\n", str2.contents);
 
-        g_hash_table_remove(watch->clone->file_watch, &watch->pa);
+            g_hash_table_remove(watch->clone->file_watch, &watch->pa);
 
-        if(str2.contents && !g_tree_lookup(watch->clone->files_accessed, str2.contents)) {
-            g_tree_insert(watch->clone->files_accessed, str2.contents, str2.contents);
-        } else {
-            g_free(str2.contents);
+            if(!g_tree_lookup(watch->clone->files_accessed, str2.contents)) {
+                g_tree_insert(watch->clone->files_accessed, str2.contents, str2.contents);
+            } else {
+                g_free(str2.contents);
+            }
         }
 
         free(str.contents);

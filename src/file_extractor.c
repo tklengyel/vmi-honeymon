@@ -5,8 +5,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
 #include <parted/parted.h>
+
+#define __USE_BSD
+#include <dirent.h>
 
 #include "structures.h"
 #include "vmi.h"
@@ -53,24 +55,32 @@ char *str_replace(const char *str, const char *old, const char *new)
 gboolean get_file(const char *file, gpointer x, honeymon_clone_t *clone) {
 
     char *tmp1 = str_replace(file, "\\", "/");
-    char *tmp2 = str_replace(tmp1, " ", "\\ ");
-    char *file_path = g_malloc0(snprintf(NULL, 0, "%s/%s/%s", TMP, clone->clone_name, tmp2) + 1);
-    sprintf(file_path, "%s/%s/%s", TMP, clone->clone_name, tmp2);
+    char *file_path = g_malloc0(snprintf(NULL, 0, "%s/%s/%s", TMP, clone->clone_name, tmp1) + 1);
+    sprintf(file_path, "%s/%s/%s", TMP, clone->clone_name, tmp1);
 
     struct stat s;
     if( stat(file_path,&s) == 0)
     {
         if( s.st_mode & S_IFREG )
         {
-            printf("Getting file '%s'\n", file_path);
             unsigned char *md5 = md5_sum(file_path);
-            printf("\t MD5: %s\n", md5);
-            free(md5);
+            if(md5) {
+                if(!g_tree_lookup(clone->origin->fschecksum, md5)) {
+                    printf("Getting file '%s'\n", file_path);
+                }
+
+                /*int i;
+                for(i=0;i<MD5_DIGEST_LENGTH;i++)
+                    printf("%.2x", md5[i]);*/
+
+                free(md5);
+            }
+
+            vmi_pause_vm(clone->vmi);
         }
     }
 
     free(tmp1);
-    free(tmp2);
     free(file_path);
     return FALSE;
 }
@@ -103,8 +113,8 @@ void extract_file (honeymon_clone_t * clone, const char *filename, GTree *files)
     disk = ped_disk_new (device);
     if (disk == NULL) goto error_destroy_disk;
 
-    command = g_malloc0(snprintf(NULL, 0, "%s -r -a %s", KPARTX, path) + 1);
-    sprintf(command, "%s -r -a %s", KPARTX, path);
+    command = g_malloc0(snprintf(NULL, 0, "%s -r -s -a %s", KPARTX, path) + 1);
+    sprintf(command, "%s -r -s -a %s", KPARTX, path);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
@@ -136,6 +146,131 @@ void extract_file (honeymon_clone_t * clone, const char *filename, GTree *files)
     }
 
     rmdir(tmp);
+
+    command = g_malloc0(snprintf(NULL, 0, "%s -d %s", KPARTX, path) + 1);
+    sprintf(command, "%s -d %s", KPARTX, path);
+    printf("** RUNNING COMMAND: %s\n", command);
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+    free(command);
+
+    ped_disk_destroy (disk);
+    ped_device_destroy (device);
+    free(lv_name);
+    free(path);
+    free(tmp);
+    return;
+
+    error_destroy_disk:
+    ped_disk_destroy (disk);
+
+    error_destroy_device:
+    ped_device_destroy (device);
+    error:
+
+    free(lv_name);
+    free(path);
+    free(tmp);
+    return;
+}
+
+void listdir(honeymon_honeypot_t *honeypot, const char *base, const char *name, int level, FILE *f)
+{
+    DIR *dir = NULL;
+    struct dirent *entry = NULL;
+
+    if (!(dir = opendir(name)))
+        return;
+    if (!(entry = readdir(dir)))
+        return;
+
+    do {
+
+       char path[1024];
+       int len = snprintf(path, sizeof(path)-1, "%s/%s", name, entry->d_name);
+       path[len] = 0;
+
+        if (entry->d_type == DT_DIR) {
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+                continue;
+            listdir(honeypot, base, path, level + 1, f);
+        } else if(entry->d_type == DT_REG) {
+            unsigned char *md5 = md5_sum(path);
+            g_tree_insert(honeypot->fschecksum, md5, strdup(path + strlen(base)));
+            fprintf(f, "%s,%s\n", md5, path + strlen(base));
+
+            /*int i;
+            for(i=0;i<MD5_DIGEST_LENGTH;i++) printf("%.2x", md5[i]);
+            printf(" %s\n", path + strlen(base));*/
+
+        }
+    } while ((entry = readdir(dir)));
+    closedir(dir);
+}
+
+void create_checksum (honeymon_t *honeymon, honeymon_honeypot_t * honeypot)
+{
+
+    PedDevice* device;
+    PedDiskType* type;
+    PedDisk* disk;
+    PedPartition* part;
+    char *command = NULL;
+
+    char *tmp = g_malloc0(snprintf(NULL, 0, "%s/%s", TMP, honeypot->origin_name) + 1);
+    sprintf(tmp, "%s/%s", TMP, honeypot->origin_name);
+
+    char* lv_name = str_replace(honeypot->lv_name, "-", "--");
+
+    char* path=g_malloc0(snprintf(NULL, 0, "%s/%s-%s", PATH_PREPEND, honeypot->vg_name, lv_name) + 1);
+    sprintf(path, "%s/%s-%s", PATH_PREPEND, honeypot->vg_name, lv_name);
+    printf("LV Path: %s\n", path);
+
+    device = ped_device_get (path);
+
+    if (device == NULL) goto error;
+
+    type = ped_disk_probe (device);
+    if (type == NULL) goto error_destroy_device;
+
+    disk = ped_disk_new (device);
+    if (disk == NULL) goto error_destroy_disk;
+
+    command = g_malloc0(snprintf(NULL, 0, "%s -r -s -a %s", KPARTX, path) + 1);
+    sprintf(command, "%s -r -s -a %s", KPARTX, path);
+    printf("** RUNNING COMMAND: %s\n", command);
+    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+    free(command);
+
+    mkdir(tmp, S_IRWXU|S_IRGRP|S_IXGRP);
+
+    char* chkpath=g_malloc0(snprintf(NULL, 0, "%s/%s.md5", honeymon->originsdir, honeypot->origin_name) + 1);
+    sprintf(chkpath, "%s/%s.md5", honeymon->originsdir, honeypot->origin_name);
+    printf("\tCreating checksum file %s\n", chkpath);
+    FILE *file = fopen ( chkpath, "w" );
+    free(chkpath);
+
+    for (part = ped_disk_next_partition (disk, NULL); part; part = ped_disk_next_partition (disk, part)) {
+        if (part->num < 0) continue;
+
+        printf("Partition: %u. Type: %s\n", part->num, (part->fs_type) ? part->fs_type->name : "");
+
+                command = g_malloc0(snprintf(NULL, 0, "%s %sp%u %s", MOUNT, path, part->num, tmp) + 1);
+                sprintf(command, "%s %sp%u %s", MOUNT, path, part->num, tmp);
+                printf("** RUNNING COMMAND: %s\n", command);
+                g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+                free(command);
+
+                listdir(honeypot, tmp, tmp, 0, file);
+
+                command = g_malloc0(snprintf(NULL, 0, "%s %s", UMOUNT, tmp) + 1);
+                sprintf(command, "%s %s", UMOUNT, tmp);
+                printf("** RUNNING COMMAND: %s\n", command);
+                g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+                free(command);
+    }
+
+    rmdir(tmp);
+    fclose ( file );
 
     command = g_malloc0(snprintf(NULL, 0, "%s -d %s", KPARTX, path) + 1);
     sprintf(command, "%s -d %s", KPARTX, path);
@@ -212,9 +347,6 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3, 
                             extract_file(clone, str2.contents, NULL);
 
                             free(str2.contents);
-                            vmi_pause_vm(vmi);
-
-                            // TODO: extract file
                         }
 
                         free(str.contents);
