@@ -67,29 +67,22 @@ void honeymon_honeypots_build_list(honeymon_t *honeymon) {
                     sprintf(path, "%s/%s", honeymon->originsdir, ep->d_name);
                     printf("\tReading checksum file %s\n", path);
                     FILE *file = fopen ( path, "r" );
-                    GTree *holder=NULL;
                     if ( file != NULL ) {
                         char line [ 2048 ];
-                        holder=g_tree_new_full((GCompareDataFunc)strcmp, NULL, (GDestroyNotify)free, (GDestroyNotify)free);
 
                         while ( fgets ( line, 2048, file ) != NULL ) {
                             char *hash=strdup(strtok(line, delim2));
                             char *f=strdup(strtok(NULL, delim2));
-                            memmove(f, f+1, strlen(f));
                             char *nl = strrchr(f, '\n');
                             if (nl) *nl = '\0';
                             nl = strrchr(f, '\r');
                             if (nl) *nl = '\0';
 
-                            printf("Inserting key %s with data %s\n", f, hash);
-                            g_tree_insert(holder, f, hash);
+                            //printf("Inserting key '%s' with data %s\n", f, hash);
+                            g_tree_insert(honeypot->fschecksum, f, hash);
                         }
                         fclose ( file );
-
-                        //printf("Appending checksum list with new tree..\n");
-                        honeypot->fschecksum=holder;
                     }
-
                     free(path);
                 }
             }
@@ -360,7 +353,7 @@ honeymon_honeypot_t* honeymon_honeypots_init_honeypot(honeymon_t *honeymon,
         origin->clone_list = g_tree_new_full((GCompareDataFunc) strcmp, NULL,
                 NULL, (GDestroyNotify) honeymon_honeypots_destroy_clone_t);
 
-        origin->fschecksum = NULL;
+        origin->fschecksum=g_tree_new_full((GCompareDataFunc) strcmp, NULL, free, free);
 
         FILE *file = fopen(origin->ip_path, "r");
         if (file != NULL) {

@@ -55,6 +55,10 @@ enum offset {
 
     HANDLE_TABLE_HANDLECOUNT,
 
+    KPCR_CURRENTTHREAD,
+
+    KTHREAD_PROCESS,
+
     OFFSET_MAX
 };
 
@@ -69,6 +73,7 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
             [EPROCESS_PDBASE]                   = 0x18,
             [EPROCESS_TASKS]                    = 0xb8,
             [EPROCESS_PNAME]                    = 0x16c,
+            [EPROCESS_PEB]                      = 0x1a8,
             [EPROCESS_OBJECTTABLE]              = 0xf4,
         },
         [BIT64] = {
@@ -90,6 +95,10 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
             [FILE_OBJECT_DEVICEOBJECT]          = 0x8,
 
             [HANDLE_TABLE_HANDLECOUNT]          = 0x58,
+
+            [KPCR_CURRENTTHREAD]                = 0x188,
+
+            [KTHREAD_PROCESS]                   = 0x210,
         }
     },
 };

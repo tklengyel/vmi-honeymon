@@ -196,6 +196,14 @@ else
     AC_ERROR([UMOUNT was not found!])
 fi
 
+# Check for CP
+AC_PATH_PROG(CP, cp)
+if test "x$CP" != "x"; then
+    AC_DEFINE_UNQUOTED(CP, "$CP", "CP path")
+else
+    AC_ERROR([CP was not found!])
+fi
+
 AC_CHECK_HEADER([magic.h], [
     AC_CHECK_LIB(magic, [magic_open, magic_load, magic_close, magic_file])
 ])

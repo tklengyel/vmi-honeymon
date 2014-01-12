@@ -579,7 +579,6 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
 
         create_checksum(honeymon, honeypot);
 
-        //TODO: MD5 checksum
     }
 
     printf("Done!\n");

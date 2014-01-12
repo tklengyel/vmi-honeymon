@@ -3,6 +3,6 @@
 
 #include <openssl/md5.h>
 
-unsigned char *md5_sum(const char *file_path);
+char *md5_sum(const char *file_path);
 
 #endif

@@ -167,10 +167,10 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
     vmi_instance_t vmi = clone->vmi;
     uint8_t trap = TRAP;
 
-        char *pe_guid = NULL, *pdb_guid = NULL;
-        get_guid(vmi, vaddr, pid, &pe_guid, &pdb_guid);
+    char *pe_guid = NULL, *pdb_guid = NULL;
+    get_guid(vmi, vaddr, pid, &pe_guid, &pdb_guid);
 
-        //printf("\t\tPE: %s PDB: %s\n", pe_guid, pdb_guid);
+    //printf("\t\tPE: %s PDB: %s\n", pe_guid, pdb_guid);
 
     GTree *guid_lookup = clone->honeymon->guids;
 

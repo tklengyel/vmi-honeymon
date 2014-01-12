@@ -121,15 +121,9 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3) {
         // Get the return address of the function
         // It is pushed through the stack
         // and RSP is pointing at it right now as a VA
-        vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
-        addr_t ret_pa=0, ret_va=0;
-
-        vmi_read_addr_va(vmi, rsp, pid, &ret_va);
-        if(pid && pid != 4) {
-            ret_pa = vmi_translate_uv2p(vmi, ret_va, pid);
-        } else {
-            ret_pa = vmi_translate_kv2p(vmi, ret_va);
-        }
+        addr_t ret_va=0;
+        vmi_read_addr_pa(vmi, vmi_pagetable_lookup(vmi, cr3, rsp), &ret_va);
+        addr_t ret_pa = vmi_pagetable_lookup(vmi, cr3, ret_va);
 
         struct pool_lookup *pool = g_hash_table_lookup(clone->pool_lookup, &ret_pa);
         if(pool) {
@@ -167,7 +161,6 @@ void pool_tracker(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3) {
 void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa, reg_t cr3, char *ts, struct pool_lookup *s) {
 
     honeymon_clone_t *clone = event->data;
-    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
 
     reg_t rax;
     vmi_get_vcpureg(vmi, &rax, RAX, event->vcpu_id);
@@ -190,12 +183,7 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa, reg_t 
 
     // Create mem event to catch when the memory space of the struct gets written to
     // so we can extract the path of the file
-    addr_t obj_pa;
-    if(pid && pid != 4) {
-        obj_pa = vmi_translate_uv2p(vmi, rax, pid);
-    } else {
-        obj_pa = vmi_translate_kv2p(vmi, rax);
-    }
+    addr_t obj_pa = vmi_pagetable_lookup(vmi, cr3, rax);
 
     uint32_t block_size = 0;
     addr_t ph_base = 0;
@@ -230,7 +218,6 @@ void pool_alloc_return(vmi_instance_t vmi, vmi_event_t *event, addr_t pa, reg_t 
     watch->vmi = vmi;
     watch->pa = last_write;
     watch->file_name = file_name;
-    watch->pid = s->pid;
     watch->clone = clone;
 
     watch->event = g_malloc0(sizeof(vmi_event_t));

@@ -63,20 +63,25 @@ gboolean get_file(const char *file, gpointer x, honeymon_clone_t *clone) {
     {
         if( s.st_mode & S_IFREG )
         {
-            unsigned char *md5 = md5_sum(file_path);
+            char *md5 = md5_sum(file_path);
             if(md5) {
-                if(!g_tree_lookup(clone->origin->fschecksum, md5)) {
-                    printf("Getting file '%s'\n", file_path);
-                }
 
-                /*int i;
-                for(i=0;i<MD5_DIGEST_LENGTH;i++)
-                    printf("%.2x", md5[i]);*/
+                //printf("checking for saved md5 with path '%s'\n", tmp1);
+                char *saved_md5 = g_tree_lookup(clone->origin->fschecksum, tmp1);
+
+                if(!saved_md5 || strcmp(md5, saved_md5)) {
+                    char *tmp2 = str_replace(file_path, " ", "\\ ");
+                    char *command = g_malloc0(snprintf(NULL, 0, "%s %s %s/%s", CP, tmp2, clone->honeymon->virusdir, md5) + 1);
+                    sprintf(command, "%s %s %s/%s", CP, tmp2, clone->honeymon->virusdir, md5);
+                    printf("** RUNNING COMMAND: %s\n", command);
+                    g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
+                    free(command);
+                    free(tmp2);
+                }
 
                 free(md5);
             }
 
-            vmi_pause_vm(clone->vmi);
         }
     }
 
@@ -101,7 +106,7 @@ void extract_file (honeymon_clone_t * clone, const char *filename, GTree *files)
 
     char* path=g_malloc0(snprintf(NULL, 0, "%s/%s-%s", PATH_PREPEND, clone->origin->vg_name, lv_name) + 1);
     sprintf(path, "%s/%s-%s", PATH_PREPEND, clone->origin->vg_name, lv_name);
-    printf("Clone LV Path: %s\n", path);
+    //printf("Clone LV Path: %s\n", path);
 
     device = ped_device_get (path);
 
@@ -115,7 +120,7 @@ void extract_file (honeymon_clone_t * clone, const char *filename, GTree *files)
 
     command = g_malloc0(snprintf(NULL, 0, "%s -r -s -a %s", KPARTX, path) + 1);
     sprintf(command, "%s -r -s -a %s", KPARTX, path);
-    printf("** RUNNING COMMAND: %s\n", command);
+    //printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 
@@ -124,11 +129,11 @@ void extract_file (honeymon_clone_t * clone, const char *filename, GTree *files)
     for (part = ped_disk_next_partition (disk, NULL); part; part = ped_disk_next_partition (disk, part)) {
         if (part->num < 0) continue;
 
-        printf("Partition: %u. Type: %s\n", part->num, (part->fs_type) ? part->fs_type->name : "");
+        //printf("Partition: %u. Type: %s\n", part->num, (part->fs_type) ? part->fs_type->name : "");
 
                 command = g_malloc0(snprintf(NULL, 0, "%s %sp%u %s", MOUNT, path, part->num, tmp) + 1);
                 sprintf(command, "%s %sp%u %s", MOUNT, path, part->num, tmp);
-                printf("** RUNNING COMMAND: %s\n", command);
+                //printf("** RUNNING COMMAND: %s\n", command);
                 g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
                 free(command);
 
@@ -140,7 +145,7 @@ void extract_file (honeymon_clone_t * clone, const char *filename, GTree *files)
 
                 command = g_malloc0(snprintf(NULL, 0, "%s %s", UMOUNT, tmp) + 1);
                 sprintf(command, "%s %s", UMOUNT, tmp);
-                printf("** RUNNING COMMAND: %s\n", command);
+                //printf("** RUNNING COMMAND: %s\n", command);
                 g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
                 free(command);
     }
@@ -149,7 +154,7 @@ void extract_file (honeymon_clone_t * clone, const char *filename, GTree *files)
 
     command = g_malloc0(snprintf(NULL, 0, "%s -d %s", KPARTX, path) + 1);
     sprintf(command, "%s -d %s", KPARTX, path);
-    printf("** RUNNING COMMAND: %s\n", command);
+    //printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 
@@ -194,14 +199,12 @@ void listdir(honeymon_honeypot_t *honeypot, const char *base, const char *name, 
                 continue;
             listdir(honeypot, base, path, level + 1, f);
         } else if(entry->d_type == DT_REG) {
-            unsigned char *md5 = md5_sum(path);
-            g_tree_insert(honeypot->fschecksum, md5, strdup(path + strlen(base)));
-            fprintf(f, "%s,%s\n", md5, path + strlen(base));
-
-            /*int i;
-            for(i=0;i<MD5_DIGEST_LENGTH;i++) printf("%.2x", md5[i]);
-            printf(" %s\n", path + strlen(base));*/
-
+            char *md5 = md5_sum(path);
+            if(md5) {
+                g_tree_insert(honeypot->fschecksum, strdup(path + strlen(base)), md5);
+                fprintf(f, "%s,%s\n", md5, path + strlen(base));
+                printf("%s,%s\n", md5, path + strlen(base));
+            }
         }
     } while ((entry = readdir(dir)));
     closedir(dir);
@@ -301,50 +304,72 @@ void create_checksum (honeymon_t *honeymon, honeymon_honeypot_t * honeypot)
 void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3, struct symbolwrap *s) {
 
     honeymon_clone_t *clone = event->data;
-    vmi_pid_t pid = vmi_dtb_to_pid(vmi, cr3);
 
     if(!strcmp(s->symbol->name, "NtSetInformationFile") || !strcmp(s->symbol->name, "ZwSetInformationFile")) {
-        if(PM2BIT(clone->pm)==BIT64) {
-            reg_t rcx, r8, r9, rsp;
-            vmi_get_vcpureg(vmi, &rcx, RCX, event->vcpu_id); // HANDLE FileHandle
-            vmi_get_vcpureg(vmi, &r8, R8, event->vcpu_id); // PVOID FileInformation
-            vmi_get_vcpureg(vmi, &r9, R9, event->vcpu_id); // ULONG Length
-            vmi_get_vcpureg(vmi, &rsp, RSP, event->vcpu_id); // stack pointer
 
-            // The 5th input, FileInformationClass, is pushed on the stack
-            // RSP:return addr, 8 bytes
-            // 4*4 bytes of homing space (for first 4 inputs)
-            uint32_t fileinfoclass = 0;
-            addr_t fileinfoclass_addr = rsp + 5*(sizeof(addr_t));
-            vmi_read_32_va(vmi, fileinfoclass_addr, pid, &fileinfoclass);
+        uint32_t fileinfoclass;
+        reg_t handle, info, length, rsp;
+        vmi_get_vcpureg(vmi, &rsp, RSP, event->vcpu_id); // stack pointer
 
-            if(fileinfoclass == FILE_DISPOSITION_INFORMATION && r9 == 1) {
+        if(PM2BIT(clone->pm)==BIT32) {
+            addr_t paddr = vmi_pagetable_lookup(vmi, cr3, rsp + sizeof(uint32_t));
+            vmi_read_32_pa(vmi, paddr, (uint32_t*)&handle);
+            paddr += 2*sizeof(uint32_t);
+            vmi_read_32_pa(vmi, paddr, (uint32_t*)&info);
+            paddr += sizeof(uint32_t);
+            vmi_read_32_pa(vmi, paddr, (uint32_t*)&length);
+            paddr += sizeof(uint32_t);
+            vmi_read_32_pa(vmi, paddr, &fileinfoclass);
+        } else {
+            vmi_get_vcpureg(vmi, &handle, RCX, event->vcpu_id); // HANDLE FileHandle
+            vmi_get_vcpureg(vmi, &info, R8, event->vcpu_id); // PVOID FileInformation
+            vmi_get_vcpureg(vmi, &length, R9, event->vcpu_id); // ULONG Length
+
+            addr_t fileinfoclass_paddr = vmi_pagetable_lookup(vmi, cr3, rsp + 5*sizeof(addr_t));
+            vmi_read_32_pa(vmi, fileinfoclass_paddr, &fileinfoclass);
+        }
+
+            if(fileinfoclass == FILE_DISPOSITION_INFORMATION && length == 1) {
                 uint8_t del = 0;
-                vmi_read_8_va(vmi, r8, pid, &del);
+                vmi_read_8_pa(vmi, vmi_pagetable_lookup(vmi, cr3, info), &del);
                 if(del) {
                     //printf("DELETE FILE _FILE_OBJECT Handle: 0x%lx.\n", rcx);
 
-                    addr_t obj = get_obj_by_handle(clone, vmi, pid, rcx);
+                    addr_t obj = get_obj_by_handle(clone, vmi, event->vcpu_id, cr3, handle);
                     addr_t file = obj + sizeof(struct object_header_win7_x64);
                     //printf("Object header is @ 0x%lx. File Object is @ 0x%lx. PID %i\n", obj, file, pid);
 
-                    struct unicode_string_x64 us = {0};
-                    vmi_read_va(vmi, file + offsets[VMI_OS_WINDOWS_7][BIT64][FILE_OBJECT_FILENAME], pid, &us, sizeof(struct unicode_string_x64));
+                    uint16_t length = 0;
+                    addr_t buffer = 0;
+                    addr_t filename_pa = vmi_pagetable_lookup(vmi, cr3, file + offsets[VMI_OS_WINDOWS_7][PM2BIT(clone->pm)][FILE_OBJECT_FILENAME]);
 
-                    if(us.length && us.buffer) {
+                    if(PM2BIT(clone->pm)==BIT32) {
+                        struct unicode_string_x86 us = {0};
+                        vmi_read_pa(vmi, filename_pa, &us, sizeof(struct unicode_string_x86));
+                        length = us.length;
+                        buffer = us.buffer;
+                    } else {
+                        struct unicode_string_x64 us = {0};
+                        vmi_read_pa(vmi, filename_pa, &us, sizeof(struct unicode_string_x64));
+                        length = us.length;
+                        buffer = us.buffer;
+                    }
+
+                    if(length && buffer) {
 
                         unicode_string_t str = {0};
-                        str.length = us.length;
+                        str.length = length;
                         str.encoding = "UTF-16";
-                        str.contents = malloc(us.length);
-                        vmi_read_va(vmi,us.buffer,pid,str.contents,us.length);
+                        str.contents = malloc(length);
+                        vmi_read_pa(vmi,vmi_pagetable_lookup(vmi, cr3, buffer),str.contents,length);
 
                         unicode_string_t str2 = {0};
                         vmi_convert_str_encoding(&str, &str2, "UTF-8");
                         if(str2.contents) {
                             printf("\tDelete request cought: %s\n", str2.contents);
 
-                            extract_file(clone, str2.contents, NULL);
+                            extract_file(clone, (const char *)str2.contents, NULL);
+                            vmi_pause_vm(clone->vmi);
 
                             free(str2.contents);
                         }
@@ -353,6 +378,5 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3, 
                     }
                 }
             }
-        }
     }
 }
