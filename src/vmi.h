@@ -51,6 +51,9 @@ enum offset {
     LDR_DATA_TABLE_ENTRY_DLLBASE,
 
     FILE_OBJECT_DEVICEOBJECT,
+    FILE_OBJECT_READACCESS,
+    FILE_OBJECT_WRITEACCESS,
+    FILE_OBJECT_DELETEACCESS,
     FILE_OBJECT_FILENAME,
 
     HANDLE_TABLE_HANDLECOUNT,
@@ -75,6 +78,26 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
             [EPROCESS_PNAME]                    = 0x16c,
             [EPROCESS_PEB]                      = 0x1a8,
             [EPROCESS_OBJECTTABLE]              = 0xf4,
+
+            [PEB_IMAGEBASADDRESS]               = 0x8,
+            [PEB_LDR]                           = 0xc,
+
+            [PEB_LDR_DATA_INLOADORDERMODULELIST]= 0xc,
+
+            [LDR_DATA_TABLE_ENTRY_DLLBASE]      = 0x18,
+
+            [FILE_OBJECT_DEVICEOBJECT]          = 0x4,
+            [FILE_OBJECT_READACCESS]            = 0x26,
+            [FILE_OBJECT_WRITEACCESS]           = 0x27,
+            [FILE_OBJECT_DELETEACCESS]          = 0x28,
+            [FILE_OBJECT_FILENAME]              = 0x30,
+
+            [HANDLE_TABLE_HANDLECOUNT]          = 0x30,
+
+            [KPCR_CURRENTTHREAD]                = 0x124,
+
+            [KTHREAD_PROCESS]                   = 0x150,
+
         },
         [BIT64] = {
             [EPROCESS_PID]                      = 0x180,
@@ -91,8 +114,11 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
 
             [LDR_DATA_TABLE_ENTRY_DLLBASE]      = 0x30,
 
-            [FILE_OBJECT_FILENAME]              = 0x58,
             [FILE_OBJECT_DEVICEOBJECT]          = 0x8,
+            [FILE_OBJECT_READACCESS]            = 0x4a,
+            [FILE_OBJECT_WRITEACCESS]           = 0x4b,
+            [FILE_OBJECT_DELETEACCESS]          = 0x4c,
+            [FILE_OBJECT_FILENAME]              = 0x58,
 
             [HANDLE_TABLE_HANDLECOUNT]          = 0x58,
 
