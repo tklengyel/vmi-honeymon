@@ -17,5 +17,5 @@
 #  along with this program; if not, see <http://www.gnu.org/licenses/>.
 
 ACLOCAL_AMFLAGS = --install -I m4
-SUBDIRS = src tools
+SUBDIRS = src tools/magic-test
 EXTRA_DIST = scripts/wrap-compiler-for-flag-check
