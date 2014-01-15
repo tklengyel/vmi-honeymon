@@ -71,12 +71,19 @@ gboolean get_file(const char *file, gpointer x, honeymon_clone_t *clone) {
 
                 if(!saved_md5 || strcmp(md5, saved_md5)) {
                     char *tmp2 = str_replace(file_path, " ", "\\ ");
+                    char *tmp3 = str_replace(tmp2, "{", "\\{");
+                    char *tmp4 = str_replace(tmp3, "}", "\\}");
                     char *command = g_malloc0(snprintf(NULL, 0, "%s %s %s/%s", CP, tmp2, clone->honeymon->virusdir, md5) + 1);
                     sprintf(command, "%s %s %s/%s", CP, tmp2, clone->honeymon->virusdir, md5);
                     printf("** RUNNING COMMAND: %s\n", command);
                     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
                     free(command);
                     free(tmp2);
+                    free(tmp3);
+                    free(tmp4);
+
+                    vmi_pause_vm(clone->vmi);
+
                 }
 
                 free(md5);
@@ -369,7 +376,6 @@ void grab_file_before_delete(vmi_instance_t vmi, vmi_event_t *event, reg_t cr3, 
                             printf("\tDelete request cought: %s\n", str2.contents);
 
                             extract_file(clone, (const char *)str2.contents, NULL);
-                            vmi_pause_vm(clone->vmi);
 
                             free(str2.contents);
                         }

@@ -8,6 +8,7 @@ char *md5_sum(const char *file_path)
 {
     FILE *inFile = fopen (file_path, "rb");
     if (inFile == NULL) {
+        printf("MD5: Failed to open file at '%s'\n", file_path);
         return NULL;
     }
 

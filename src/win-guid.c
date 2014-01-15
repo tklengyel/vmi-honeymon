@@ -178,12 +178,15 @@ status_t get_guid(vmi_instance_t vmi, addr_t base_vaddr, uint32_t pid, char **pe
 
     status_t ret=VMI_FAILURE;
 
-    if(pe_guid==NULL || pdb_guid==NULL) return ret;
+    if(pe_guid==NULL || pdb_guid==NULL) {
+        printf("Invalid input into get guid!\n");
+        return ret;
+    }
 
     uint8_t pe[MAX_HEADER_SIZE];
 
     if(VMI_FAILURE == peparse_get_image_virt(vmi, base_vaddr, pid, MAX_HEADER_SIZE, pe)) {
-        //printf("Failed to read PE header @ %u:0x%lx\n", pid, base_vaddr);
+        printf("Failed to read PE header @ %u:0x%lx\n", pid, base_vaddr);
         return ret;
     }
 
@@ -212,13 +215,14 @@ status_t get_guid(vmi_instance_t vmi, addr_t base_vaddr, uint32_t pid, char **pe
         size_of_image=oh32plus->size_of_image;
     }
 
+    *pe_guid=malloc(snprintf(NULL,0,"%.8x%.5x", pe_header->time_date_stamp, size_of_image)+1);
+    sprintf(*pe_guid, "%.8x%.5x", pe_header->time_date_stamp, size_of_image);
+    ret = VMI_SUCCESS;
+
     struct image_debug_directory debug_directory;
     size_t read=vmi_read_va(vmi, base_vaddr + debug_offset, pid, (uint8_t *)&debug_directory, sizeof(struct image_debug_directory));
-
-    if(read == sizeof(struct image_debug_directory)) {
-        *pe_guid=malloc(snprintf(NULL,0,"%.8x%.5x", pe_header->time_date_stamp, size_of_image)+1);
-        sprintf(*pe_guid, "%.8x%.5x", pe_header->time_date_stamp, size_of_image);
-        ret = VMI_SUCCESS;
+    if(read != sizeof(struct image_debug_directory)) {
+        return ret;
     }
 
     if(debug_directory.type != IMAGE_DEBUG_TYPE_CODEVIEW) {

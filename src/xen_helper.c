@@ -356,9 +356,9 @@ int honeymon_xen_clone_vm(honeymon_t* honeymon, const char* dom) {
     disks->values[0] = backup_disk;
 
     command = malloc(
-            snprintf(NULL, 0, "%s restore -p %s %s", XL, clone_config_path,
+            snprintf(NULL, 0, "%s restore -e -p %s %s", XL, clone_config_path,
                     honeypot->snapshot_path) + 1);
-    sprintf(command, "%s restore -p %s %s", XL, clone_config_path, honeypot->snapshot_path);
+    sprintf(command, "%s restore -e -p %s %s", XL, clone_config_path, honeypot->snapshot_path);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
@@ -540,15 +540,21 @@ int honeymon_xen_designate_vm(honeymon_t* honeymon, char *dom) {
             config->config_length, output_config, "header");
     close(cfd);
 
-    char *command = g_malloc0(
-            snprintf(NULL, 0, "%s -v save %u %s", XL, domID, output) + 1);
-    sprintf(command, "%s -v save %u %s", XL, domID, output);
+    char *command;
+
+    command = g_malloc0(
+            snprintf(NULL, 0, "%s save %u %s", XL, domID, output) + 1);
+    sprintf(command, "%s save %u %s", XL, domID, output);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
     free(command);
 
-    command = g_malloc0(snprintf(NULL, 0, "%s restore -p %s", XL, output) + 1);
-    sprintf(command, "%s restore -p %s", XL, output);
+    /*FILE *save = fopen(output, "w");
+    xc_domain_save(xen->xc, fileno(save), domID, ~0, ~0, XCFLAGS_HVM, NULL, 1, 0);
+    fclose(save);*/
+
+    command = g_malloc0(snprintf(NULL, 0, "%s restore -e -p %s", XL, output) + 1);
+    sprintf(command, "%s restore -e -p %s", XL, output);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
 	free(command);
@@ -641,9 +647,9 @@ int honeymon_xen_restore_origin(honeymon_t* honeymon, char* dom) {
 
     /* We need to call the XL program itself for this... sigh */
     char *command = malloc(
-            snprintf(NULL, 0, "%s restore -p %s %s", XL, config_path, path)
+            snprintf(NULL, 0, "%s restore -e -p %s %s", XL, config_path, path)
                     + 1);
-    sprintf(command, "%s restore -p %s %s", XL, config_path, path);
+    sprintf(command, "%s restore -e -p %s %s", XL, config_path, path);
     printf("** RUNNING COMMAND: %s\n", command);
     g_spawn_command_line_sync(command, NULL, NULL, NULL, NULL);
 	free(command);

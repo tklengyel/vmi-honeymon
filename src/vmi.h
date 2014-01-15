@@ -22,6 +22,7 @@
 #define VMI_H
 
 #include "structures.h"
+#include "win7_sp1_x86_config.h"
 #include "win7_sp1_x64_config.h"
 #include "vmi-poolmon.h"
 
@@ -49,6 +50,8 @@ enum offset {
     PEB_LDR_DATA_INLOADORDERMODULELIST,
 
     LDR_DATA_TABLE_ENTRY_DLLBASE,
+    LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE,
+    LDR_DATA_TABLE_ENTRY_BASEDLLNAME,
 
     FILE_OBJECT_DEVICEOBJECT,
     FILE_OBJECT_READACCESS,
@@ -85,6 +88,8 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
             [PEB_LDR_DATA_INLOADORDERMODULELIST]= 0xc,
 
             [LDR_DATA_TABLE_ENTRY_DLLBASE]      = 0x18,
+            [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE]  = 0x20,
+            [LDR_DATA_TABLE_ENTRY_BASEDLLNAME]  = 0x2c,
 
             [FILE_OBJECT_DEVICEOBJECT]          = 0x4,
             [FILE_OBJECT_READACCESS]            = 0x26,
@@ -113,6 +118,8 @@ static size_t offsets[VMI_OS_WINDOWS_7+1][2][OFFSET_MAX] = {
             [PEB_LDR_DATA_INLOADORDERMODULELIST]= 0x10,
 
             [LDR_DATA_TABLE_ENTRY_DLLBASE]      = 0x30,
+            [LDR_DATA_TABLE_ENTRY_SIZEOFIMAGE]  = 0x40,
+            [LDR_DATA_TABLE_ENTRY_BASEDLLNAME]  = 0x58,
 
             [FILE_OBJECT_DEVICEOBJECT]          = 0x8,
             [FILE_OBJECT_READACCESS]            = 0x4a,

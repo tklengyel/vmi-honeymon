@@ -204,20 +204,22 @@ typedef struct honeypot {
 } honeymon_honeypot_t;
 
 struct symbol {
-    char *name;
+    const char *name;
     addr_t rva;
-};
+    uint8_t type;
+    int inputs;
+} __attribute__ ((packed));
 
 struct config {
-    char *name;
-    char **guids;
-    struct symbol *syms;
-    uint64_t *sym_count;
-};
+    const char *name;
+    const char **guids;
+    const struct symbol *syms;
+    const uint64_t *sym_count;
+} __attribute__ ((packed));
 
 struct symbolwrap {
-    struct config *config;
-    struct symbol *symbol;
+    const struct config *config;
+    const struct symbol *symbol;
     addr_t pa;
     uint8_t backup;
     vmi_instance_t vmi;

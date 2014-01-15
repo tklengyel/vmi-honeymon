@@ -21,14 +21,16 @@ bin_PROGRAMS = vmi-honeymon
 vmi_honeymon_SOURCES =  vmi-honeymon.c input_parser.c xen_helper.c \
                         honeypots.c scan.c rpc_server.c \
                         file_extractor.c log.c log_mysql.c \
-                        vmi.c win-guid.c vmi-poolmon.c win-handles.c \
-                        pooltag.c md5.c
+                        vmi.c vmi-poolmon.c \
+                        win-syms.c win-guid.c win-handles.c \
+                        pooltag.c md5.c injector.c
 
 vmi_honeymon_h =  structures.h vmi-honeymon.h input_parser.h xen_helper.h \
                         honeypots.h scan.h rpc_server.h \
                         file_extractor.h log.h log_mysql.h \
-                        vmi.h win-guid.h vmi-poolmon.h win-handles.h \
-                        pooltag.h md5.h
+                        vmi.h vmi-poolmon.h \
+                        win-syms.h win-guid.h win-handles.h \
+                        pooltag.h md5.h injector.h
 
 vmi_honeymon_SOURCES += $(vmi_honeymon_h)
 

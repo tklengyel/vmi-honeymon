@@ -44,12 +44,18 @@
 #include "vmi-poolmon.h"
 #include "file_extractor.h"
 
+static uint64_t read_count, write_count, x_count;
+
 void vmi_build_guid_tree(honeymon_t *honeymon) {
     honeymon->guids = g_tree_new((GCompareFunc)strcmp);
     uint32_t i;
+    for(i=0;i<win7_sp1_x86_config_count;i++) {
+        g_tree_insert(honeymon->guids, (gpointer)win7_sp1_x86_config[i].guids[0], (gpointer)&win7_sp1_x86_config[i]);
+        g_tree_insert(honeymon->guids, (gpointer)win7_sp1_x86_config[i].guids[1], (gpointer)&win7_sp1_x86_config[i]);
+    }
     for(i=0;i<win7_sp1_x64_config_count;i++) {
-        g_tree_insert(honeymon->guids, win7_sp1_x64_config[i].guids[0], &win7_sp1_x64_config[i]);
-        g_tree_insert(honeymon->guids, win7_sp1_x64_config[i].guids[1], &win7_sp1_x64_config[i]);
+        g_tree_insert(honeymon->guids, (gpointer)win7_sp1_x64_config[i].guids[0], (gpointer)&win7_sp1_x64_config[i]);
+        g_tree_insert(honeymon->guids, (gpointer)win7_sp1_x64_config[i].guids[1], (gpointer)&win7_sp1_x64_config[i]);
     }
 }
 
@@ -79,11 +85,28 @@ void mem_event_cb(vmi_instance_t vmi, vmi_event_t *event){
     honeymon_clone_t *clone = event->data;
     addr_t pa = (event->mem_event.gfn << 12) + event->mem_event.offset;
 
+    reg_t rip, cr3;
+    vmi_get_vcpureg(vmi, &rip, RIP, event->vcpu_id);
+    vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
+
     struct symbolwrap *s = g_hash_table_lookup(clone->pa_lookup, &pa);
 
-    vmi_clear_event(vmi, event);
+    /*    if(event->mem_event.out_access & VMI_MEMACCESS_R)
+            read_count++;
+        if(event->mem_event.out_access & VMI_MEMACCESS_W)
+            write_count++;
+        if(event->mem_event.out_access & VMI_MEMACCESS_X)
+            x_count++;
 
-    if(s) {
+    printf("Read %lu  |  Write %lu  |  Exec %lu  |  GLA 0x%lx -> %s\n", read_count, write_count, x_count, event->mem_event.gla, s ? s->symbol->name : "-");
+
+    if(read_count || x_count >= 1000000) {
+        vmi_pause_vm(vmi);
+    }
+
+    vmi_clear_event(vmi, event);
+    vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);*/
+
         /*printf("PA %"PRIx64" ACCESS: %c%c%c for GFN %"PRIx64" (offset %06"PRIx64") gla %016"PRIx64" (vcpu %u)\n",
             pa,
             (event->mem_event.out_access & VMI_MEMACCESS_R) ? 'r' : '-',
@@ -94,6 +117,7 @@ void mem_event_cb(vmi_instance_t vmi, vmi_event_t *event){
             event->mem_event.gla,
             event->vcpu_id);*/
 
+    if(s) {
         if(event->mem_event.out_access & VMI_MEMACCESS_R) {
             printf("Read memaccess @ Symbol: %s!%s\n", s->config->name, s->symbol->name);
             vmi_write_8_pa(vmi, pa, &s->backup);
@@ -128,13 +152,15 @@ void int3_cb(vmi_instance_t vmi, vmi_event_t *event) {
         //printf("%s DTB: %"PRIi32" PA=%"PRIx64" RIP=%"PRIx64" Symbol: %s!%s\n",
         //  ts, (int)cr3, pa, event->interrupt_event.gla, s->config->name, s->symbol->name);
 
-        if(!strcmp(s->config->name,"ntkrnlmp")) {
-            if(!strncmp(s->symbol->name, "ExAllocatePoolWithTag", 21) || !strcmp(s->symbol->name, "ExAllocatePoolWithQuotaTag")) {
+        if(!strcmp(s->config->name,"ntkrnlmp") || !strcmp(s->config->name,"ntkrpamp")) {
+            if(!strncmp(s->symbol->name, "ExAllocatePoolWithTag", 21) || !strcmp(s->symbol->name, "ExAllocatePoolWithQuotaTag") ||
+               !strcmp(s->symbol->name, "_ExAllocatePoolWithTag_12") || !strcmp(s->symbol->name, "_ExAllocatePoolWithQuotaTag_12")) {
                 pool_tracker(vmi, event, cr3);
             }
 
             if(!strcmp(s->symbol->name, "NtDeleteFile") || !strcmp(s->symbol->name, "ZwDeleteFile") ||
-               !strcmp(s->symbol->name, "NtSetInformationFile") || !strcmp(s->symbol->name, "ZwSetInformationFile")
+               !strcmp(s->symbol->name, "NtSetInformationFile") || !strcmp(s->symbol->name, "ZwSetInformationFile") ||
+               !strcmp(s->symbol->name, "_NtSetInformationFile_20") || !strcmp(s->symbol->name, "_ZwSetInformationFile_20")
             ) {
                 grab_file_before_delete(vmi, event, cr3, s);
             }
@@ -186,18 +212,17 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
             uint64_t trapped = 0;
             for(; i < *(config->sym_count); i++) {
 
-                // skip symbols starting with _ (latency)
-                if(config->syms[i].name[0] == 0x5f)
-                    continue;
+                // We are only going to trap functions for now
+                if(config->syms[i].type == 0) continue;
 
                 // only trap Nt* functions in ntdll (latency)
-                if(!strcmp(config->name, "ntdll")) {
-                    if(strncmp(config->syms[i].name, "Nt", 2)) // && strncmp(s->conf->syms[i].name, "Zw", 2))
-                        continue;
-                }
+                /*if(!strcmp(config->name, "ntdll")) {
+                    //if(strncmp(config->syms[i].name, "Nt", 2)) // && strncmp(s->conf->syms[i].name, "Zw", 2))
+                    //    continue;
+                } else continue;*/
 
                 //DEBUG
-                if(strcmp(config->name, "ntkrnlmp")) continue;
+                if(strcmp(config->name, "ntkrnlmp") && strcmp(config->name,"ntkrpamp")) continue;
 
                 // get pa
                 addr_t pa =0;
@@ -229,9 +254,6 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
                 wrap->backup = byte;
                 wrap->pa = pa;
 
-                // write trap
-                vmi_write_8_pa(vmi, pa, &trap);
-
                 wrap->guard = g_malloc0(sizeof(vmi_event_t));
                 SETUP_MEM_EVENT(wrap->guard, pa, VMI_MEMEVENT_BYTE, VMI_MEMACCESS_RW, mem_event_cb);
                 wrap->guard->data = clone;
@@ -240,6 +262,9 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
                     wrap->guard = NULL;
                 }
 
+                // write trap
+                vmi_write_8_pa(vmi, pa, &trap);
+
                 // save trap location into lookup tree
                 g_hash_table_insert(clone->pa_lookup, &wrap->pa, wrap);
 
@@ -247,7 +272,7 @@ void inject_traps_pe(honeymon_clone_t *clone, addr_t vaddr, uint32_t pid) {
                 printf("\t\tTrap added @ VA 0x%lx PA 0x%lx for %s!%s. Backup: 0x%x\n", vaddr + config->syms[i].rva, pa, config->name, config->syms[i].name, wrap->backup);
             }
 
-            printf("\tInjected %lu traps into PE with GUID %s:%s\n", trapped, pe_guid, pdb_guid);
+            printf("\tInjected %lu traps into PE with GUID %s:%s in PID %i\n", trapped, pe_guid, pdb_guid, pid);
         }
 
         g_free(pe_guid);
@@ -288,7 +313,7 @@ void inject_traps_modules(honeymon_clone_t *clone, addr_t list_head, vmi_pid_t p
             unicode_string_t out = { 0 };
             if (us &&
                 VMI_SUCCESS == vmi_convert_str_encoding(us, &out, "UTF-8")) {
-                printf("\t%s\n", out.contents);
+                printf("\t%s @ 0x%lx\n", out.contents, dllbase);
                 free(out.contents);
             }   // if
             if (us) vmi_free_unicode_str(us);
@@ -367,10 +392,12 @@ void *clone_vmi_thread(void *input) {
 
     vmi_register_event(clone->vmi, &interrupt_event);
 
+    read_count = write_count = x_count = 0;
+
     vmi_resume_vm(clone->vmi);
 
     while (!clone->interrupted) {
-        //printf("Waiting for events...\n");
+        //printf("Waiting for events in VMI-Honeymon...\n");
         status_t status = vmi_events_listen(clone->vmi, 500);
         if (status != VMI_SUCCESS) {
             printf("Error waiting for events, quitting...\n");

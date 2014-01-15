@@ -170,8 +170,8 @@
 #include "win7_sp1_x64/wordpad.h"
 #include "win7_sp1_x64/TSpkg.h"
 #include "win7_sp1_x64/UxTheme.h"
-static uint64_t win7_sp1_x64_config_count = 169;
-static struct config win7_sp1_x64_config[] = {
+static const uint64_t win7_sp1_x64_config_count = 169;
+static const struct config win7_sp1_x64_config[] = {
 	{.name="vsstrace", .guids=win7_sp1_x64_vsstrace_guid, .syms=win7_sp1_x64_vsstrace, .sym_count=&win7_sp1_x64_vsstrace_count},
 	{.name="ndis", .guids=win7_sp1_x64_ndis_guid, .syms=win7_sp1_x64_ndis, .sym_count=&win7_sp1_x64_ndis_count},
 	{.name="wbemcntl", .guids=win7_sp1_x64_wbemcntl_guid, .syms=win7_sp1_x64_wbemcntl, .sym_count=&win7_sp1_x64_wbemcntl_count},
